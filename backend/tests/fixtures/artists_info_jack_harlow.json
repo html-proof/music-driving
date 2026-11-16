@@ -1,0 +1,135 @@
+[
+ {
+  "seokey": "jack-harlow",
+  "artist_id": "817522",
+  "name": "Jack Harlow",
+  "song_count": "322",
+  "album_count": "211",
+  "favorite_count": "18349",
+  "artist_url": "https://gaana.com/artist/jack-harlow",
+  "images": {
+   "urls": {
+    "large_artwork": "https://a10.gaanacdn.com/gn_img/artists/XYybzrb2gz/Yybzn4Bgb2/size_l_1607927137.webp",
+    "medium_artwork": "https://a10.gaanacdn.com/gn_img/artists/XYybzrb2gz/Yybzn4Bgb2/size_m_1607927137.webp",
+    "small_artwork": "https://a10.gaanacdn.com/gn_img/artists/XYybzrb2gz/Yybzn4Bgb2/size_s_1607927137.webp"
+   }
+  },
+  "top_tracks": [
+   {
+    "seokey": "industry-baby",
+    "album_seokey": "industry-baby",
+    "track_id": "37456154",
+    "title": "INDUSTRY BABY",
+    "artists": "Lil Nas X, Jack Harlow",
+    "artist_seokeys": "lil-nas-x, jack-harlow",
+    "artist_ids": "1764015, 817522",
+    "artist_image": "https://a10.gaanacdn.com/gn_img/artists/mGjKr1b6zX/GjKrqEmJb6/size_m_1740726230.webp",
+    "album": "INDUSTRY BABY",
+    "album_id": "4441426",
+    "duration": "214",
+    "popularity": "9767582~9767582",
+    "genres": "Hip Hop",
+    "is_explicit": true,
+    "language": "English",
+    "label": "Sony Music",
+    "release_date": "2021-07-23",
+    "play_count": "9M+",
+    "favorite_count": 107194,
+    "song_url": "https://gaana.com/song/industry-baby",
+    "album_url": "https://gaana.com/album/industry-baby",
+    "images": {
+     "urls": {
+      "large_artwork": "https://a10.gaanacdn.com/gn_img/albums/7rVW1Rbk56/VW1aNjDnWk/size_l.jpg",
+      "medium_artwork": "https://a10.gaanacdn.com/gn_img/albums/7rVW1Rbk56/VW1aNjDnWk/size_m.jpg",
+      "small_artwork": "https://a10.gaanacdn.com/gn_img/albums/7rVW1Rbk56/VW1aNjDnWk/size_s.jpg"
+     }
+    },
+    "stream_urls": {
+     "urls": {
+      "very_high_quality": "https://vodhlsgaana-ebw.akamaized.net/hls/26/4441426/37456154/320.mp4.master.m3u8?hdnts=st=1794817818~exp=1794832218~acl=/hls/26/4441426/37456154/*~hmac=b6746acb01fd7f96a3033dc39184e52528f5adf33a2a84f5655a2bdc7514efc7",
+      "high_quality": "https://vodhlsgaana-ebw.akamaized.net/hls/26/4441426/37456154/128.mp4.master.m3u8?hdnts=st=1794817818~exp=1794832218~acl=/hls/26/4441426/37456154/*~hmac=b6746acb01fd7f96a3033dc39184e52528f5adf33a2a84f5655a2bdc7514efc7",
+      "medium_quality": "https://vodhlsgaana-ebw.akamaized.net/hls/26/4441426/37456154/64.mp4.master.m3u8?hdnts=st=1794817818~exp=1794832218~acl=/hls/26/4441426/37456154/*~hmac=b6746acb01fd7f96a3033dc39184e52528f5adf33a2a84f5655a2bdc7514efc7",
+      "low_quality": "https://vodhlsgaana-ebw.akamaized.net/hls/26/4441426/37456154/16.mp4.master.m3u8?hdnts=st=1794817818~exp=1794832218~acl=/hls/26/4441426/37456154/*~hmac=b6746acb01fd7f96a3033dc39184e52528f5adf33a2a84f5655a2bdc7514efc7"
+     }
+    }
+   },
+   {
+    "seokey": "industry-baby-23",
+    "album_seokey": "industry-baby-20",
+    "track_id": "38809957",
+    "title": "INDUSTRY BABY",
+    "artists": "Lil Nas X, Jack Harlow",
+    "artist_seokeys": "lil-nas-x, jack-harlow",
+    "artist_ids": "1764015, 817522",
+    "artist_image": "https://a10.gaanacdn.com/gn_img/artists/mGjKr1b6zX/GjKrqEmJb6/size_m_1740726230.webp",
+    "album": "INDUSTRY BABY 2.0",
+    "album_id": "4762853",
+    "duration": "214",
+    "popularity": "112965~112965",
+    "genres": "Hip Hop",
+    "is_explicit": false,
+    "language": "English",
+    "label": "Sony Music",
+    "release_date": "2021-07-23",
+    "play_count": "100K+",
+    "favorite_count": 1346,
+    "song_url": "https://gaana.com/song/industry-baby-23",
+    "album_url": "https://gaana.com/album/industry-baby-20",
+    "images": {
+     "urls": {
+      "large_artwork": "https://a10.gaanacdn.com/gn_img/albums/a7LWBkzbzX/LWBkEVBJbz/size_l.jpg",
+      "medium_artwork": "https://a10.gaanacdn.com/gn_img/albums/a7LWBkzbzX/LWBkEVBJbz/size_m.jpg",
+      "small_artwork": "https://a10.gaanacdn.com/gn_img/albums/a7LWBkzbzX/LWBkEVBJbz/size_s.jpg"
+     }
+    },
+    "stream_urls": {
+     "urls": {
+      "very_high_quality": "https://vodhlsgaana-ebw.akamaized.net/hls/53/4762853/38809957/320.mp4.master.m3u8?hdnts=st=1794817818~exp=1794832218~acl=/hls/53/4762853/38809957/*~hmac=2ae1b4f417ac9c886611fb5621d3c6d0d56b83aeab4089a3043ad4855ae5b490",
+      "high_quality": "https://vodhlsgaana-ebw.akamaized.net/hls/53/4762853/38809957/128.mp4.master.m3u8?hdnts=st=1794817818~exp=1794832218~acl=/hls/53/4762853/38809957/*~hmac=2ae1b4f417ac9c886611fb5621d3c6d0d56b83aeab4089a3043ad4855ae5b490",
+      "medium_quality": "https://vodhlsgaana-ebw.akamaized.net/hls/53/4762853/38809957/64.mp4.master.m3u8?hdnts=st=1794817818~exp=1794832218~acl=/hls/53/4762853/38809957/*~hmac=2ae1b4f417ac9c886611fb5621d3c6d0d56b83aeab4089a3043ad4855ae5b490",
+      "low_quality": "https://vodhlsgaana-ebw.akamaized.net/hls/53/4762853/38809957/16.mp4.master.m3u8?hdnts=st=1794817818~exp=1794832218~acl=/hls/53/4762853/38809957/*~hmac=2ae1b4f417ac9c886611fb5621d3c6d0d56b83aeab4089a3043ad4855ae5b490"
+     }
+    }
+   },
+   {
+    "seokey": "3d-feat-jack-harlow-1",
+    "album_seokey": "golden-english-2023-34",
+    "track_id": "61003148",
+    "title": "3D (feat. Jack Harlow)",
+    "artists": "Jung Kook, Jack Harlow",
+    "artist_seokeys": "jung-kook, jack-harlow",
+    "artist_ids": "1622704, 817522",
+    "artist_image": "https://a10.gaanacdn.com/gn_img/artists/10q3Z1K52r/0q3Zdjmob5/size_m_1704881584.webp",
+    "album": "GOLDEN",
+    "album_id": "10599740",
+    "duration": "201",
+    "popularity": "8881~8881",
+    "genres": "K-pop",
+    "is_explicit": true,
+    "language": "English",
+    "label": "BIGHIT MUSIC",
+    "release_date": "2023-11-03",
+    "play_count": "<100K",
+    "favorite_count": 357,
+    "song_url": "https://gaana.com/song/3d-feat-jack-harlow-1",
+    "album_url": "https://gaana.com/album/golden-english-2023-34",
+    "images": {
+     "urls": {
+      "large_artwork": "https://a10.gaanacdn.com/gn_img/albums/qaLKY23pO4/LKYAzdowKp/size_l.jpg",
+      "medium_artwork": "https://a10.gaanacdn.com/gn_img/albums/qaLKY23pO4/LKYAzdowKp/size_m.jpg",
+      "small_artwork": "https://a10.gaanacdn.com/gn_img/albums/qaLKY23pO4/LKYAzdowKp/size_s.jpg"
+     }
+    },
+    "stream_urls": {
+     "urls": {
+      "very_high_quality": "https://vodhlsgaana-ebw.akamaized.net/hls/40/10599740/61003148/320.mp4.master.m3u8?hdnts=st=1794817818~exp=1794832218~acl=/hls/40/10599740/61003148/*~hmac=726cf634163f9bd2d6f0133ad307fef9dbe305764e977da6ca2a60fce1d843fe",
+      "high_quality": "https://vodhlsgaana-ebw.akamaized.net/hls/40/10599740/61003148/128.mp4.master.m3u8?hdnts=st=1794817818~exp=1794832218~acl=/hls/40/10599740/61003148/*~hmac=726cf634163f9bd2d6f0133ad307fef9dbe305764e977da6ca2a60fce1d843fe",
+      "medium_quality": "https://vodhlsgaana-ebw.akamaized.net/hls/40/10599740/61003148/64.mp4.master.m3u8?hdnts=st=1794817818~exp=1794832218~acl=/hls/40/10599740/61003148/*~hmac=726cf634163f9bd2d6f0133ad307fef9dbe305764e977da6ca2a60fce1d843fe",
+      "low_quality": "https://vodhlsgaana-ebw.akamaized.net/hls/40/10599740/61003148/16.mp4.master.m3u8?hdnts=st=1794817818~exp=1794832218~acl=/hls/40/10599740/61003148/*~hmac=726cf634163f9bd2d6f0133ad307fef9dbe305764e977da6ca2a60fce1d843fe"
+     }
+    }
+   }
+  ],
+  "total_tracks": 20
+ }
+]

@@ -1,0 +1,53 @@
+[
+ {
+  "seokey": "gaana-dj-hindi-top-50-1",
+  "playlist_id": "1038627",
+  "title": "Hindi Top 50",
+  "language": "Hindi",
+  "favorite_count": 2542038,
+  "is_explicit": true,
+  "play_count": "1B+",
+  "playlist_url": "https://gaana.com/playlist/gaana-dj-hindi-top-50-1",
+  "images": {
+   "urls": {
+    "large_artwork": "https://a10.gaanacdn.com/gn_pl_img/playlists/P7m3GNKqxo/7m3GQwOybq/size_m_1793105696.jpg",
+    "medium_artwork": "https://a10.gaanacdn.com/gn_pl_img/playlists/P7m3GNKqxo/7m3GQwOybq/size_m_1793105696.jpg",
+    "small_artwork": "https://a10.gaanacdn.com/gn_pl_img/playlists/P7m3GNKqxo/7m3GQwOybq/size_m_1793105696.jpg"
+   }
+  }
+ },
+ {
+  "seokey": "gaana-dj-punjabi-all-time-top-50",
+  "playlist_id": "63635468",
+  "title": "Punjabi All Time Top 50",
+  "language": "Punjabi",
+  "favorite_count": 30821,
+  "is_explicit": true,
+  "play_count": "20M+",
+  "playlist_url": "https://gaana.com/playlist/gaana-dj-punjabi-all-time-top-50",
+  "images": {
+   "urls": {
+    "large_artwork": "https://a10.gaanacdn.com/gn_pl_img/playlists/zLp36PvbrG/p36EzPv0Kr/size_m_1792405145.jpg",
+    "medium_artwork": "https://a10.gaanacdn.com/gn_pl_img/playlists/zLp36PvbrG/p36EzPv0Kr/size_m_1792405145.jpg",
+    "small_artwork": "https://a10.gaanacdn.com/gn_pl_img/playlists/zLp36PvbrG/p36EzPv0Kr/size_m_1792405145.jpg"
+   }
+  }
+ },
+ {
+  "seokey": "gaana-dj-all-time-top-50",
+  "playlist_id": "63626166",
+  "title": "All Time Top 100",
+  "language": "English",
+  "favorite_count": 27585,
+  "is_explicit": true,
+  "play_count": "11M+",
+  "playlist_url": "https://gaana.com/playlist/gaana-dj-all-time-top-50",
+  "images": {
+   "urls": {
+    "large_artwork": "https://a10.gaanacdn.com/gn_pl_img/playlists/XYybzNrb2g/ybzpmXQE32/size_m_1789971837.jpg",
+    "medium_artwork": "https://a10.gaanacdn.com/gn_pl_img/playlists/XYybzNrb2g/ybzpmXQE32/size_m_1789971837.jpg",
+    "small_artwork": "https://a10.gaanacdn.com/gn_pl_img/playlists/XYybzNrb2g/ybzpmXQE32/size_m_1789971837.jpg"
+   }
+  }
+ }
+]

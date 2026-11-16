@@ -1,0 +1,12 @@
+fastapi==0.162.2
+uvicorn[standard]==0.54.0
+sqlalchemy[asyncio]>=2.0.40,<2.1
+alembic>=1.15
+psycopg[binary]>=3.2
+aiosqlite>=0.21
+pydantic>=2.10
+pydantic-settings>=2.8
+email-validator>=2.2
+pyjwt>=2.10
+redis>=5.2
+httpx>=0.28

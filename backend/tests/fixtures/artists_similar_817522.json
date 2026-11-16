@@ -1,0 +1,50 @@
+[
+ {
+  "seokey": "eminem",
+  "artist_id": "7075",
+  "name": "Eminem",
+  "song_count": 1642,
+  "album_count": 512,
+  "favorite_count": 567911,
+  "artist_url": "https://gaana.com/artist/eminem",
+  "images": {
+   "urls": {
+    "large_artwork": "https://a10.gaanacdn.com/gn_img/artists/VdNW0JMKo5/dNW0X1NWo5/size_l_1720780282.jpg",
+    "medium_artwork": "https://a10.gaanacdn.com/gn_img/artists/VdNW0JMKo5/dNW0X1NWo5/size_m_1720780282.jpg",
+    "small_artwork": "https://a10.gaanacdn.com/gn_img/artists/VdNW0JMKo5/dNW0X1NWo5/size_s_1720780282.jpg"
+   }
+  }
+ },
+ {
+  "seokey": "travis-scott-1",
+  "artist_id": "5014577",
+  "name": "Travis Scott",
+  "song_count": 950,
+  "album_count": 484,
+  "favorite_count": 214523,
+  "artist_url": "https://gaana.com/artist/travis-scott-1",
+  "images": {
+   "urls": {
+    "large_artwork": "https://a10.gaanacdn.com/gn_img/artists/dwN39y83DP/N39ylYAN3D/size_l_1715067192.jpg",
+    "medium_artwork": "https://a10.gaanacdn.com/gn_img/artists/dwN39y83DP/N39ylYAN3D/size_m_1715067192.jpg",
+    "small_artwork": "https://a10.gaanacdn.com/gn_img/artists/dwN39y83DP/N39ylYAN3D/size_s_1715067192.jpg"
+   }
+  }
+ },
+ {
+  "seokey": "post-malone",
+  "artist_id": "774296",
+  "name": "Post Malone",
+  "song_count": 785,
+  "album_count": 224,
+  "favorite_count": 299789,
+  "artist_url": "https://gaana.com/artist/post-malone",
+  "images": {
+   "urls": {
+    "large_artwork": "https://a10.gaanacdn.com/gn_img/artists/0wrb4kNWLg/wrb48PYybL/size_l_1717592245.jpg",
+    "medium_artwork": "https://a10.gaanacdn.com/gn_img/artists/0wrb4kNWLg/wrb48PYybL/size_m_1717592245.jpg",
+    "small_artwork": "https://a10.gaanacdn.com/gn_img/artists/0wrb4kNWLg/wrb48PYybL/size_s_1717592245.jpg"
+   }
+  }
+ }
+]

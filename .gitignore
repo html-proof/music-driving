@@ -1,0 +1,15 @@
+# secrets
+.env
+*.pem
+deploy/certs/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.db
+
+# flutter (mobile/ has its own .gitignore too)
+mobile/build/
+mobile/.dart_tool/

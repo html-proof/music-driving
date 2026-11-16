@@ -1,0 +1,42 @@
+diff -ru gp_orig/api/gaanapy.py b/api/gaanapy.py
+--- gp_orig/api/gaanapy.py	2026-11-16 14:09:45.813943100 +0530
++++ b/api/gaanapy.py	2026-11-16 14:09:44.174578700 +0530
+@@ -27,6 +27,14 @@
+                 response = await self.aiohttp.get(url, **kwargs)
+             else:
+                 response = await self.aiohttp.post(url, **kwargs)
++        except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
++            # Network failures are outages, not "no results".
++            raise UpstreamError(f"Gaana unreachable: {type(exc).__name__}") from exc
++        # Blocked / rate-limited / server errors are outages too; surfacing them lets
++        # clients show "provider unavailable" instead of a misleading empty result.
++        if response.status in (401, 403, 429) or response.status >= 500:
++            raise UpstreamError(f"Gaana returned HTTP {response.status}")
++        try:
+             if response.status != 200:
+                 return await self.errors.no_results()
+             result = await response.json()
+@@ -35,3 +43,7 @@
+             return result
+         except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, TypeError):
+             return await self.errors.no_results()
++
++
++class UpstreamError(Exception):
++    """Gaana could not be reached or refused the request (handled as HTTP 502 by app.py)."""
+diff -ru gp_orig/api/playlists/playlists.py b/api/playlists/playlists.py
+--- gp_orig/api/playlists/playlists.py	2026-11-16 14:09:45.815945900 +0530
++++ b/api/playlists/playlists.py	2026-11-16 13:52:59.160803900 +0530
+@@ -3,8 +3,10 @@
+         endpoints = self.api_endpoints
+         errors = self.errors
+         result = await self._safe_request("POST", endpoints.playlist_details_url + playlist_id)
+-        if isinstance(result, dict) and "error" in result:
+-            return result
++        # Gaana now includes "error": "SUCCESS" in successful playlist payloads,
++        # so only treat the response as an error when it carries no tracks.
++        if isinstance(result, dict) and "error" in result and not result.get("tracks"):
++            return await errors.no_results()
+         track_count = result.get('count')
+         if not track_count:
+             return await errors.no_results()

@@ -1,0 +1,34 @@
+[
+ {
+  "seokey": "arijit-singh",
+  "artist_id": "52767",
+  "name": "Arijit Singh",
+  "song_count": "5835",
+  "album_count": "2702",
+  "favorite_count": "18700963",
+  "artist_url": "https://gaana.com/artist/arijit-singh",
+  "images": {
+   "urls": {
+    "large_artwork": "https://a10.gaanacdn.com/gn_img/artists/Dk9KNk23Bx/k9KNqJJbBx/size_l_1739172212.webp",
+    "medium_artwork": "https://a10.gaanacdn.com/gn_img/artists/Dk9KNk23Bx/k9KNqJJbBx/size_m_1739172212.webp",
+    "small_artwork": "https://a10.gaanacdn.com/gn_img/artists/Dk9KNk23Bx/k9KNqJJbBx/size_s_1739172212.webp"
+   }
+  }
+ },
+ {
+  "seokey": "ajit-singh",
+  "artist_id": "2375",
+  "name": "Ajit Singh",
+  "song_count": "724",
+  "album_count": "301",
+  "favorite_count": "4143",
+  "artist_url": "https://gaana.com/artist/ajit-singh",
+  "images": {
+   "urls": {
+    "large_artwork": "https://a10.gaanacdn.com/gn_img/artists/VdNW0JMKo5/dNW0JqOKo5/size_l.jpg",
+    "medium_artwork": "https://a10.gaanacdn.com/gn_img/artists/VdNW0JMKo5/dNW0JqOKo5/size_m.jpg",
+    "small_artwork": "https://a10.gaanacdn.com/gn_img/artists/VdNW0JMKo5/dNW0JqOKo5/size_s.jpg"
+   }
+  }
+ }
+]

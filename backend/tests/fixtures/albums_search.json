@@ -1,0 +1,50 @@
+[
+ {
+  "seokey": "shape-of-you-ed-sheeran-danny-mccartney",
+  "album_id": "5867557",
+  "title": "Shape of You (Ed Sheeran - Danny McCartney)",
+  "artists": "Danny McCartney",
+  "artist_seokeys": "danny-mccartney",
+  "artist_ids": "3218727",
+  "duration": "362",
+  "is_explicit": false,
+  "language": "English",
+  "label": "Danny McCartney",
+  "track_count": "2",
+  "release_date": "2022-05-25",
+  "play_count": "<100K",
+  "favorite_count": "112",
+  "album_url": "https://gaana.com/album/shape-of-you-ed-sheeran-danny-mccartney",
+  "images": {
+   "urls": {
+    "large_artwork": "https://a10.gaanacdn.com/gn_img/albums/XzVWRyL3dq/VWRynqk13d/size_l.jpg",
+    "medium_artwork": "https://a10.gaanacdn.com/gn_img/albums/XzVWRyL3dq/VWRynqk13d/size_m.jpg",
+    "small_artwork": "https://a10.gaanacdn.com/gn_img/albums/XzVWRyL3dq/VWRynqk13d/size_s.jpg"
+   }
+  }
+ },
+ {
+  "seokey": "shape-of-you-single",
+  "album_id": "1852885",
+  "title": "Shape of You - Single",
+  "artists": "Power Music Workout",
+  "artist_seokeys": "power-music-workout",
+  "artist_ids": "383171",
+  "duration": "628",
+  "is_explicit": false,
+  "language": "English",
+  "label": "Power Music, Inc.",
+  "track_count": "2",
+  "release_date": "2017-01-16",
+  "play_count": "2M+",
+  "favorite_count": "7774",
+  "album_url": "https://gaana.com/album/shape-of-you-single",
+  "images": {
+   "urls": {
+    "large_artwork": "https://a10.gaanacdn.com/gn_img/albums/01A3mar3NQ/1A3mn1VaWN/size_l.jpg",
+    "medium_artwork": "https://a10.gaanacdn.com/gn_img/albums/01A3mar3NQ/1A3mn1VaWN/size_m.jpg",
+    "small_artwork": "https://a10.gaanacdn.com/gn_img/albums/01A3mar3NQ/1A3mn1VaWN/size_s.jpg"
+   }
+  }
+ }
+]

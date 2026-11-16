@@ -1,0 +1,79 @@
+{
+ "tracks": {
+  "error": "Unable to find any results!"
+ },
+ "albums": [
+  {
+   "seokey": "sweet-action-ii-rb4AzVVVKL",
+   "album_id": "18377952",
+   "title": "Sweet Action II",
+   "artists": "Babyface, Jack Harlow",
+   "artist_seokeys": "jack-harlow",
+   "artist_ids": "817522",
+   "duration": "924",
+   "is_explicit": true,
+   "language": "English",
+   "label": "Atlantic Records",
+   "track_count": "7",
+   "release_date": "2026-11-06",
+   "play_count": "<100K",
+   "favorite_count": "2",
+   "album_url": "https://gaana.com/album/sweet-action-ii-rb4AzVVVKL",
+   "images": {
+    "urls": {
+     "large_artwork": "https://a10.gaanacdn.com/gn_img/albums/0wrb4qNKLg/rb4AzVVVKL/size_l.jpg",
+     "medium_artwork": "https://a10.gaanacdn.com/gn_img/albums/0wrb4qNKLg/rb4AzVVVKL/size_m.jpg",
+     "small_artwork": "https://a10.gaanacdn.com/gn_img/albums/0wrb4qNKLg/rb4AzVVVKL/size_s.jpg"
+    }
+   }
+  },
+  {
+   "seokey": "fresh-ybz2eQ1Zb2",
+   "album_id": "18379122",
+   "title": "FRESH",
+   "artists": "Lil Baby, Young Thug, Rylo Rodriguez, Future",
+   "artist_seokeys": "lil-baby",
+   "artist_ids": "1369335",
+   "duration": "2880",
+   "is_explicit": true,
+   "language": "English",
+   "label": "Quality Control Music/Motown Records",
+   "track_count": "17",
+   "release_date": "2026-11-06",
+   "play_count": "<100K",
+   "favorite_count": "1",
+   "album_url": "https://gaana.com/album/fresh-ybz2eQ1Zb2",
+   "images": {
+    "urls": {
+     "large_artwork": "https://a10.gaanacdn.com/gn_img/albums/XYybzrb2gz/ybz2eQ1Zb2/size_s_1794007200.jpg",
+     "medium_artwork": "https://a10.gaanacdn.com/gn_img/albums/XYybzrb2gz/ybz2eQ1Zb2/size_s_1794007200.jpg",
+     "small_artwork": "https://a10.gaanacdn.com/gn_img/albums/XYybzrb2gz/ybz2eQ1Zb2/size_s_1794007200.jpg"
+    }
+   }
+  },
+  {
+   "seokey": "the-life-of-a-girl-the-encore",
+   "album_id": "17750588",
+   "title": "The Life of a Showgirl: The Encore",
+   "artists": "Taylor Swift, Sabrina Carpenter",
+   "artist_seokeys": "taylor-swift",
+   "artist_ids": "7286",
+   "duration": "3356",
+   "is_explicit": true,
+   "language": "English",
+   "label": "Taylor Swift",
+   "track_count": "16",
+   "release_date": "2026-09-25",
+   "play_count": "<100K",
+   "favorite_count": "40",
+   "album_url": "https://gaana.com/album/the-life-of-a-girl-the-encore",
+   "images": {
+    "urls": {
+     "large_artwork": "https://a10.gaanacdn.com/gn_img/albums/lJvKa56KDV/vKaXQRokbD/size_s_1790314463.jpg",
+     "medium_artwork": "https://a10.gaanacdn.com/gn_img/albums/lJvKa56KDV/vKaXQRokbD/size_s_1790314463.jpg",
+     "small_artwork": "https://a10.gaanacdn.com/gn_img/albums/lJvKa56KDV/vKaXQRokbD/size_s_1790314463.jpg"
+    }
+   }
+  }
+ ]
+}

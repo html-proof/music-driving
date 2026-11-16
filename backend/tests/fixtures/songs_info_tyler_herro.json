@@ -1,0 +1,40 @@
+[
+ {
+  "seokey": "tyler-herro",
+  "album_seokey": "tyler-herro",
+  "track_id": "32408795",
+  "title": "Tyler Herro",
+  "artists": "Jack Harlow",
+  "artist_seokeys": "jack-harlow",
+  "artist_ids": "817522",
+  "artist_image": "https://a10.gaanacdn.com/gn_img/artists/XYybzrb2gz/Yybzn4Bgb2/size_m_1607927137.webp",
+  "album": "Tyler Herro",
+  "album_id": "3487503",
+  "duration": "156",
+  "popularity": "18879~18879",
+  "genres": "Hip Hop",
+  "is_explicit": true,
+  "language": "English",
+  "label": "Generation Now/Atlantic",
+  "release_date": "2020-10-21",
+  "play_count": "<100K",
+  "favorite_count": 253,
+  "song_url": "https://gaana.com/song/tyler-herro",
+  "album_url": "https://gaana.com/album/tyler-herro",
+  "images": {
+   "urls": {
+    "large_artwork": "https://a10.gaanacdn.com/gn_img/albums/4Z9bqo3yQn/Z9bq2AG1Ky/size_l.jpg",
+    "medium_artwork": "https://a10.gaanacdn.com/gn_img/albums/4Z9bqo3yQn/Z9bq2AG1Ky/size_m.jpg",
+    "small_artwork": "https://a10.gaanacdn.com/gn_img/albums/4Z9bqo3yQn/Z9bq2AG1Ky/size_s.jpg"
+   }
+  },
+  "stream_urls": {
+   "urls": {
+    "very_high_quality": "https://vodhlsgaana-ebw.akamaized.net/hls/3/3487503/32408795/320.mp4.master.m3u8?hdnts=st=1794817806~exp=1794832206~acl=/hls/3/3487503/32408795/*~hmac=675ae7835c95cac4dd0b1276a69efe948d41b9f96dbc3243faa0fdee835eae4c",
+    "high_quality": "https://vodhlsgaana-ebw.akamaized.net/hls/3/3487503/32408795/128.mp4.master.m3u8?hdnts=st=1794817806~exp=1794832206~acl=/hls/3/3487503/32408795/*~hmac=675ae7835c95cac4dd0b1276a69efe948d41b9f96dbc3243faa0fdee835eae4c",
+    "medium_quality": "https://vodhlsgaana-ebw.akamaized.net/hls/3/3487503/32408795/64.mp4.master.m3u8?hdnts=st=1794817806~exp=1794832206~acl=/hls/3/3487503/32408795/*~hmac=675ae7835c95cac4dd0b1276a69efe948d41b9f96dbc3243faa0fdee835eae4c",
+    "low_quality": "https://vodhlsgaana-ebw.akamaized.net/hls/3/3487503/32408795/16.mp4.master.m3u8?hdnts=st=1794817806~exp=1794832206~acl=/hls/3/3487503/32408795/*~hmac=675ae7835c95cac4dd0b1276a69efe948d41b9f96dbc3243faa0fdee835eae4c"
+   }
+  }
+ }
+]
