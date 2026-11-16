@@ -1,0 +1,89 @@
+from app.integrations.errors import ProviderNotFound
+from app.integrations.gaanapy import normalize as n
+from app.integrations.gaanapy.client import GaanaPyClient
+from app.integrations.provider import ProviderTrack
+from app.schemas.music import (
+    AlbumDetail,
+    AlbumSummary,
+    ArtistDetail,
+    ArtistSummary,
+    NewReleases,
+    PlaylistDetail,
+    PlaylistSummary,
+    Track,
+    TrackPage,
+)
+
+
+class GaanaProvider:
+    name = "gaana"
+
+    def __init__(self, client: GaanaPyClient):
+        self.client = client
+
+    async def health(self) -> bool:
+        return await self.client.health()
+
+    async def search_songs(self, query: str, limit: int) -> list[Track]:
+        return [n.track(r) for r in n.records(await self.client.search_songs(query, limit))]
+
+    async def search_albums(self, query: str, limit: int) -> list[AlbumSummary]:
+        return [n.album_summary(r) for r in n.records(await self.client.search_albums(query, limit))]
+
+    async def search_artists(self, query: str, limit: int) -> list[ArtistSummary]:
+        return [n.artist_summary(r) for r in n.records(await self.client.search_artists(query, limit))]
+
+    async def get_song(self, song_id: str) -> ProviderTrack:
+        rows = n.records(await self.client.song_info(song_id))
+        # songDetail can return several versions; prefer the exact seokey.
+        row = next((r for r in rows if r["seokey"] == song_id), rows[0] if rows else None)
+        if row is None:
+            raise ProviderNotFound(f"Song {song_id} not found")
+        return ProviderTrack(n.track(row), n.stream_urls(row))
+
+    async def get_album(self, album_id: str) -> AlbumDetail:
+        rows = n.records(await self.client.album_info(album_id))
+        if not rows:
+            raise ProviderNotFound(f"Album {album_id} not found")
+        return n.album_detail(rows[0])
+
+    async def similar_albums(self, album_numeric_id: str, limit: int) -> list[AlbumSummary]:
+        return [n.album_summary(r) for r in n.records(await self.client.similar_albums(album_numeric_id, limit))]
+
+    async def get_artist(self, artist_id: str, limit: int) -> ArtistDetail:
+        rows = n.records(await self.client.artist_info(artist_id, limit))
+        if not rows:
+            raise ProviderNotFound(f"Artist {artist_id} not found")
+        return n.artist_detail(rows[0])
+
+    async def artist_tracks(self, artist_numeric_id: str, limit: int, page: int) -> TrackPage:
+        payload = await self.client.artist_tracks(artist_numeric_id, limit, page)
+        items = [n.track(r) for r in n.records((payload or {}).get("tracks"))]
+        total = payload.get("total") if isinstance(payload, dict) else None
+        total = total if isinstance(total, int) else None
+        # GaanaPy's `total` is the number returned in this page, so infer has_more from page fullness.
+        return TrackPage(items=items, page=page, limit=limit, total=None, has_more=len(items) >= limit)
+
+    async def similar_artists(self, artist_numeric_id: str, limit: int) -> list[ArtistSummary]:
+        return [n.artist_summary(r) for r in n.records(await self.client.similar_artists(artist_numeric_id, limit))]
+
+    async def trending(self, language: str, limit: int) -> list[Track]:
+        return [n.track(r) for r in n.records(await self.client.trending(language, limit))]
+
+    async def new_releases(self, language: str, limit: int) -> NewReleases:
+        payload = await self.client.new_releases(language, limit) or {}
+        return NewReleases(
+            language=language,
+            tracks=[n.track(r) for r in n.records(payload.get("tracks"))],
+            albums=[n.album_summary(r) for r in n.records(payload.get("albums"))],
+        )
+
+    async def charts(self, limit: int) -> list[PlaylistSummary]:
+        return [n.playlist_summary(r) for r in n.records(await self.client.charts(limit))]
+
+    async def get_playlist(self, playlist_id: str) -> PlaylistDetail:
+        tracks = [n.track(r) for r in n.records(await self.client.playlist_info(playlist_id))]
+        if not tracks:
+            raise ProviderNotFound(f"Playlist {playlist_id} not found")
+        # GaanaPy only returns the tracks; metadata is filled in by the catalog service.
+        return PlaylistDetail(id=playlist_id, title=playlist_id.replace("-", " ").title(), tracks=tracks)

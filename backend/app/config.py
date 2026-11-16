@@ -1,73 +1,67 @@
-"""Runtime settings, read from environment variables (see backend/.env.example).
+from functools import lru_cache
 
-Nothing here is secret: the backend has no accounts, database or API keys.
-"""
-
-from __future__ import annotations
-
-import os
-from dataclasses import dataclass, field
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-def _env(name: str, default: str) -> str:
-    return os.environ.get(name, default).strip()
+class Settings(BaseSettings):
+    """Application settings, loaded from environment variables / .env."""
+
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    app_name: str = "Melodia API"
+    environment: str = "development"  # development | test | production
+    debug: bool = False
+    log_level: str = "INFO"
+
+    # Database
+    database_url: str = "postgresql+psycopg://melodia:melodia@localhost:5432/melodia"
+    db_pool_size: int = 10
+    db_max_overflow: int = 20
+    db_echo: bool = False
+
+    # Cache (empty -> in-process memory cache, fine for a single dev instance only)
+    redis_url: str = ""
+
+    # Security
+    jwt_secret: str = Field(default="change-me-in-env", min_length=16)
+    jwt_algorithm: str = "HS256"
+    access_token_ttl_minutes: int = 15
+    refresh_token_ttl_days: int = 30
+
+    # CORS (comma separated)
+    cors_origins: str = "*"
+
+    # Music provider (GaanaPy service)
+    gaanapy_base_url: str = "http://localhost:8001"
+    provider_timeout_seconds: float = 30.0
+    provider_retries: int = 2
+    catalog_cache_ttl_seconds: int = 900
+    search_cache_ttl_seconds: int = 300
+    # Stream URLs carry their own expiry; refresh this long before it.
+    stream_refresh_margin_seconds: int = 600
+    verify_stream_quality: bool = True
+
+    default_languages: str = "English,Hindi"
+
+    # Lyrics (LRCLIB is free and returns time-synced LRC lyrics)
+    lyrics_base_url: str = "https://lrclib.net"
+    lyrics_user_agent: str = "Melodia/1.0 (self-hosted music app)"
+    lyrics_enabled: bool = True
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def default_language_list(self) -> list[str]:
+        return [lang.strip() for lang in self.default_languages.split(",") if lang.strip()]
+
+    @property
+    def is_sqlite(self) -> bool:
+        return self.database_url.startswith("sqlite")
 
 
-def _int(name: str, default: int) -> int:
-    try:
-        return int(_env(name, str(default)))
-    except ValueError:
-        return default
-
-
-def _bool(name: str, default: bool) -> bool:
-    return _env(name, "true" if default else "false").lower() in {"1", "true", "yes", "on"}
-
-
-def _list(name: str, default: str) -> list[str]:
-    return [p.strip() for p in _env(name, default).split(",") if p.strip()]
-
-
-@dataclass(frozen=True)
-class Settings:
-    app_name: str = "Music Hub API"
-    version: str = "2.0.0"
-    log_level: str = field(default_factory=lambda: _env("LOG_LEVEL", "info"))
-    cors_origins: list[str] = field(default_factory=lambda: _list("CORS_ORIGINS", "*"))
-
-    # Languages Gaana accepts for trending / new releases.
-    default_language: str = field(default_factory=lambda: _env("DEFAULT_LANGUAGE", "English"))
-    languages: list[str] = field(default_factory=lambda: _list(
-        "LANGUAGES",
-        "English,Hindi,Punjabi,Tamil,Telugu,Bengali,Marathi,Kannada,Malayalam,Gujarati,Bhojpuri",
-    ))
-
-    # Upstream (Gaana via GaanaPy)
-    upstream_timeout_seconds: int = field(default_factory=lambda: _int("UPSTREAM_TIMEOUT_SECONDS", 20))
-    upstream_concurrency: int = field(default_factory=lambda: _int("UPSTREAM_CONCURRENCY", 8))
-
-    # In-memory cache
-    cache_max_entries: int = field(default_factory=lambda: _int("CACHE_MAX_ENTRIES", 5000))
-    cache_ttl_catalog: int = field(default_factory=lambda: _int("CACHE_TTL_CATALOG", 1800))
-    cache_ttl_search: int = field(default_factory=lambda: _int("CACHE_TTL_SEARCH", 600))
-    cache_ttl_feed: int = field(default_factory=lambda: _int("CACHE_TTL_FEED", 1800))
-    cache_ttl_empty: int = field(default_factory=lambda: _int("CACHE_TTL_EMPTY", 60))
-
-    # Streams: refresh a URL this many seconds before its provider token expires.
-    stream_refresh_margin: int = field(default_factory=lambda: _int("STREAM_REFRESH_MARGIN", 900))
-    stream_verify: bool = field(default_factory=lambda: _bool("STREAM_VERIFY", True))
-
-    # Lyrics (LRCLIB, free and keyless)
-    lyrics_enabled: bool = field(default_factory=lambda: _bool("LYRICS_ENABLED", True))
-    lyrics_base_url: str = field(default_factory=lambda: _env("LYRICS_BASE_URL", "https://lrclib.net"))
-    lyrics_user_agent: str = field(default_factory=lambda: _env(
-        "LYRICS_USER_AGENT", "MusicHub/2.0 (+https://github.com/ZingyTomato/GaanaPy)"))
-
-    # Per-client request limit (requests per minute; 0 disables).
-    rate_limit_per_minute: int = field(default_factory=lambda: _int("RATE_LIMIT_PER_MINUTE", 300))
-    # Only trust X-Forwarded-For / X-Real-IP from these peers (nginx on the same host).
-    trusted_proxies: list[str] = field(default_factory=lambda: _list("TRUSTED_PROXIES", "127.0.0.1,::1"))
-
-
+@lru_cache
 def get_settings() -> Settings:
     return Settings()

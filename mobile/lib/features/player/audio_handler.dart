@@ -6,6 +6,7 @@ import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../core/config/app_config.dart';
 import '../../core/errors/app_exception.dart';
 import '../../models/catalog.dart';
 import '../../models/track.dart';
@@ -108,6 +109,16 @@ class MelodiaAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandle
   Duration _lastPosition = Duration.zero;
   String? _activeStreamQuality;
   String? _errorMessage;
+  // Where the track being loaded starts. While a load is in flight the engine still
+  // reports the *previous* source's position, which must never reach the UI, lyrics,
+  // notification or the Previous-button rule.
+  Duration _loadPosition = Duration.zero;
+  Duration? _seekWhileLoading;
+  // Whether the in-flight load should start playing; play/pause pressed during a load
+  // change this instead of being lost.
+  bool _playAfterLoad = false;
+  String? _lastRecoveredTrackId;
+  DateTime _lastRecoveryAt = DateTime.fromMillisecondsSinceEpoch(0);
   Timer? _persistTimer;
   Timer? _syncDebounce;
   DateTime _lastProgressReport = DateTime.fromMillisecondsSinceEpoch(0);
@@ -118,7 +129,15 @@ class MelodiaAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandle
   Stream<Duration> get positionStream => _engine.positionStream;
   Stream<Duration> get bufferedPositionStream => _engine.bufferedPositionStream;
   Duration get position => _engine.position;
-  Duration get displayPosition => _needsLoad ? (_pendingPosition ?? Duration.zero) : _engine.position;
+
+  /// Position of the *current* track as every control sees it: the restored position
+  /// before the first load, the start/seek target while a track is loading, otherwise
+  /// the audio engine's real position.
+  Duration get displayPosition {
+    if (_needsLoad) return _pendingPosition ?? Duration.zero;
+    if (_loading) return _seekWhileLoading ?? _loadPosition;
+    return _engine.position;
+  }
 
   PlayQueue get playQueue => _queue;
   Track? get currentTrack => _queue.current;
@@ -158,7 +177,9 @@ class MelodiaAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandle
         case AudioInterruptionType.pause:
         case AudioInterruptionType.unknown:
           // `unknown` = permanent focus loss (another music app): never auto-resume.
-          _resumeAfterInterruption = _engine.playing && type == AudioInterruptionType.pause;
+          final wasPlaying = _engine.playing || (_loading && _playAfterLoad);
+          _resumeAfterInterruption = wasPlaying && type == AudioInterruptionType.pause;
+          _playAfterLoad = false;
           await _engine.pause(); // not pause(): that would count as a user action
           _persist();
       }
@@ -204,7 +225,7 @@ class MelodiaAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandle
       _errors.add('None of these songs can be played right now.');
       return;
     }
-    await _reportListen(completed: false);
+    _reportListen(completed: false);
     final start = tracks.isEmpty ? 0 : playable.indexOf(tracks[startIndex.clamp(0, tracks.length - 1)]);
     if (shuffle != null) _queue.shuffle = shuffle;
     _queue.replace(playable, startIndex: start < 0 ? 0 : start);
@@ -241,10 +262,13 @@ class MelodiaAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandle
     _publishQueue();
   }
 
+  /// Audio quality for every future stream. Saved on the device with the queue, so it
+  /// survives restarts without any account or server-side preference.
   Future<void> setQuality(String quality) async {
     if (quality == _quality) return;
     _quality = quality;
     _streams.clear();
+    _persist();
     if (_queue.current != null && !_needsLoad) {
       await _load(play: _engine.playing, position: _engine.position);
     }
@@ -255,6 +279,11 @@ class MelodiaAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandle
   Future<void> play() async {
     _resumeAfterInterruption = false; // an explicit user action wins over a pending auto-resume
     if (_queue.current == null) return;
+    if (_loading) {
+      _playAfterLoad = true; // the in-flight load starts playback when ready
+      _broadcast();
+      return;
+    }
     if (_errorMessage != null) {
       // Retry after a failure: fetch a fresh URL at the same spot.
       _errorMessage = null;
@@ -273,8 +302,10 @@ class MelodiaAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandle
 
   @override
   Future<void> pause() async {
-    // A manual pause must never be undone by an interruption ending later.
+    // A manual pause must never be undone by an interruption ending later, nor by a
+    // load that is still in flight.
     _resumeAfterInterruption = false;
+    _playAfterLoad = false;
     await _engine.pause();
     _persist();
   }
@@ -285,19 +316,16 @@ class MelodiaAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandle
     _broadcast();
   }
 
-  /// The position the Previous rule must look at. While the next song is loading the
-  /// engine still reports the *old* song's position, so a quick Next→Previous would
-  /// otherwise restart instead of going back; the new song is at 0:00.
-  Duration get _previousDecisionPosition {
-    if (_loading) return Duration.zero;
-    if (_needsLoad) return _pendingPosition ?? Duration.zero;
-    return _engine.position;
-  }
-
   @override
   Future<void> seek(Duration position) async {
     if (_needsLoad) {
       _pendingPosition = position;
+      _broadcast();
+      return;
+    }
+    if (_loading) {
+      // Applied as soon as the new source is ready; seeking the old source would be lost.
+      _seekWhileLoading = position;
       _broadcast();
       return;
     }
@@ -309,7 +337,7 @@ class MelodiaAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandle
   @override
   Future<void> skipToNext() async {
     if (_queue.isEmpty) return;
-    await _reportListen(completed: false);
+    _reportListen(completed: false);
     // Repeat-one only loops on natural completion; a Next press always moves on.
     if (_queue.next()) {
       await _load(play: true);
@@ -325,11 +353,14 @@ class MelodiaAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandle
   @override
   Future<void> skipToPrevious() async {
     if (_queue.isEmpty) return;
-    switch (decidePrevious(position: _previousDecisionPosition, hasPrevious: _queue.hasPrevious)) {
+    // displayPosition is the new song's position even while it is still loading (the
+    // engine would still report the old song's), so a quick Next→Previous goes back and
+    // repeated Previous presses walk back through the queue, like Spotify.
+    switch (decidePrevious(position: displayPosition, hasPrevious: _queue.hasPrevious)) {
       case PreviousAction.restartCurrent:
         await seek(Duration.zero);
       case PreviousAction.playPrevious:
-        await _reportListen(completed: false);
+        _reportListen(completed: false);
         _queue.previous();
         await _load(play: true);
         _publishQueue(sync: false);
@@ -339,7 +370,7 @@ class MelodiaAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandle
   @override
   Future<void> skipToQueueItem(int index) async {
     if (index < 0 || index >= _queue.length) return;
-    await _reportListen(completed: false);
+    _reportListen(completed: false);
     _queue.jumpTo(index);
     await _load(play: true);
     _publishQueue(sync: false);
@@ -364,7 +395,7 @@ class MelodiaAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandle
 
   @override
   Future<void> stop() async {
-    await _reportListen(completed: false);
+    _reportListen(completed: false);
     await _engine.stop();
     _persist();
     _broadcast();
@@ -395,8 +426,11 @@ class MelodiaAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandle
     _needsLoad = false;
     _pendingPosition = null;
     _loading = true;
+    _loadPosition = position ?? Duration.zero;
+    _seekWhileLoading = null;
+    _playAfterLoad = play;
     _listenedSeconds = 0;
-    _lastPosition = position ?? Duration.zero;
+    _lastPosition = _loadPosition;
     mediaItem.add(mediaItemFor(track));
     _broadcast();
     try {
@@ -404,17 +438,26 @@ class MelodiaAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandle
       if (generation != _loadGeneration) return; // user skipped meanwhile
       await _engine.setUrl(info.url, initialPosition: position);
       if (generation != _loadGeneration) return;
+      final seekTo = _seekWhileLoading;
+      _seekWhileLoading = null;
+      if (seekTo != null) {
+        await _engine.seek(seekTo);
+        _lastPosition = seekTo;
+        if (generation != _loadGeneration) return;
+      }
       _activeStreamQuality = info.quality;
       _consecutiveFailures = 0;
       _loading = false;
-      if (play) await _engine.play();
+      if (_playAfterLoad) await _engine.play();
       _broadcast();
       _persist();
       _prefetchNext();
     } catch (e) {
       if (generation != _loadGeneration) return;
+      final failedAt = _seekWhileLoading ?? _loadPosition;
+      _seekWhileLoading = null;
       _loading = false;
-      await _onTrackFailed(track, e, play: play);
+      await _onTrackFailed(track, e, play: _playAfterLoad, position: failedAt);
     }
   }
 
@@ -426,18 +469,22 @@ class MelodiaAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandle
     }
   }
 
-  /// One bad song must never kill the queue: report it and move on.
-  Future<void> _onTrackFailed(Track track, Object error, {required bool play}) async {
-    _consecutiveFailures++;
+  /// One bad song must never kill the queue: report it and move on. A lost connection
+  /// is not the song's fault, so it holds the song at its position instead.
+  Future<void> _onTrackFailed(Track track, Object error, {required bool play, Duration position = Duration.zero}) async {
     _streams.remove(track.id);
-    final reason = AppException.from(error).message;
+    final failure = AppException.from(error);
+    final reason = failure.message;
+    if (failure.isNetwork) {
+      _errors.add('Connection lost. Press play to retry "${track.title}".');
+      await _stopWithError(reason, position);
+      return;
+    }
+    _consecutiveFailures++;
     if (_consecutiveFailures >= _queue.length || !_queue.hasNext) {
       _errors.add('Couldn\'t play "${track.title}": $reason');
       _consecutiveFailures = 0;
-      await _engine.stop();
-      _needsLoad = true; // a later play() retries
-      _errorMessage = reason;
-      _broadcast();
+      await _stopWithError(reason, Duration.zero);
       return;
     }
     _errors.add('Couldn\'t play "${track.title}" — skipping. ($reason)');
@@ -446,30 +493,46 @@ class MelodiaAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandle
     await _load(play: play);
   }
 
+  /// Stop on the current song in the error state; play() retries from [position].
+  Future<void> _stopWithError(String reason, Duration position) async {
+    _resumeAfterInterruption = false;
+    await _engine.stop();
+    _needsLoad = true;
+    _pendingPosition = position;
+    _errorMessage = reason;
+    _broadcast();
+    _persist();
+  }
+
   Future<void> _onEngineError(Object error) async {
     final track = _queue.current;
-    if (track == null || _loading) return;
-    // Mid-stream failure (expired token, network drop): re-resolve once at the same position.
-    if (!_recovering) {
-      _recovering = true;
-      try {
-        final pos = _engine.position;
-        final wasPlaying = _engine.playing;
-        await _streamFor(track, forceRefresh: true);
-        await _load(play: wasPlaying, position: pos);
-        return;
-      } catch (_) {
-        // fall through to skipping
-      } finally {
-        _recovering = false;
-      }
+    if (track == null || _loading || _recovering) return;
+    final pos = _engine.position;
+    final wasPlaying = _engine.playing;
+    final now = DateTime.now();
+    // Failing again right after a recovery means the song is broken, not that its URL
+    // expired: stop retrying it (otherwise it would loop forever).
+    if (_lastRecoveredTrackId == track.id && now.difference(_lastRecoveryAt) < const Duration(seconds: 10)) {
+      await _onTrackFailed(track, error, play: wasPlaying, position: pos);
+      return;
     }
-    await _onTrackFailed(track, error, play: true);
+    // Mid-stream failure (expired token, network drop): fetch a fresh URL and continue at
+    // the same position, keeping the user's play/pause state. If that fails, _load
+    // reports it (network loss holds the song; a dead song is skipped).
+    _recovering = true;
+    _lastRecoveredTrackId = track.id;
+    _lastRecoveryAt = now;
+    try {
+      _streams.remove(track.id);
+      await _load(play: wasPlaying, position: pos);
+    } finally {
+      _recovering = false;
+    }
   }
 
   Future<void> _onCompleted() async {
     if (_loading) return;
-    await _reportListen(completed: true);
+    _reportListen(completed: true);
     if (_queue.repeat == RepeatMode.one) {
       await _engine.seek(Duration.zero);
       await _engine.play();
@@ -488,6 +551,7 @@ class MelodiaAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandle
   }
 
   void _onPosition(Duration pos) {
+    if (_loading) return; // late events from the previous source
     final delta = pos - _lastPosition;
     if (_engine.playing && delta > Duration.zero && delta < const Duration(seconds: 2)) {
       _listenedSeconds += delta.inMilliseconds / 1000;
@@ -501,7 +565,7 @@ class MelodiaAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandle
     }
   }
 
-  Future<void> _reportListen({required bool completed}) async {
+  void _reportListen({required bool completed}) {
     final track = _queue.current;
     if (track == null || _listenedSeconds <= 0) return;
     final seconds = _listenedSeconds;
@@ -524,7 +588,7 @@ class MelodiaAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandle
     unawaited(_reporter.syncSession(
       queue: _queue.playOrder.map((t) => t.id).toList(),
       currentIndex: _queue.position,
-      positionSeconds: _engine.position.inMilliseconds / 1000,
+      positionSeconds: displayPosition.inMilliseconds / 1000,
       shuffle: _queue.shuffle,
       repeatMode: _queue.repeat.name,
       quality: _quality,
@@ -535,17 +599,20 @@ class MelodiaAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandle
   void _persist() {
     _persistTimer?.cancel();
     _persistTimer = Timer(const Duration(milliseconds: 500), () {
-      final pos = _needsLoad ? (_pendingPosition ?? Duration.zero) : _engine.position;
+      final pos = displayPosition;
       unawaited(_store.save({
         'queue': _queue.toJson(),
         'position_ms': pos.inMilliseconds,
         'context': _context,
+        'quality': _quality,
       }));
     });
   }
 
   Future<void> _restore() async {
     final saved = await _store.load();
+    final savedQuality = saved?['quality'];
+    if (savedQuality is String && AppConfig.audioQualities.containsKey(savedQuality)) _quality = savedQuality;
     if (saved == null || saved['queue'] == null) return;
     final restored = PlayQueue.fromJson(saved['queue'] as Map<String, dynamic>);
     if (restored.isEmpty) return;
@@ -602,8 +669,8 @@ class MelodiaAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandle
       androidCompactActionIndices: const [0, 1, 2],
       processingState: processing,
       playing: playing,
-      updatePosition: _needsLoad ? (_pendingPosition ?? Duration.zero) : _engine.position,
-      bufferedPosition: _engine.bufferedPosition,
+      updatePosition: displayPosition,
+      bufferedPosition: _loading || _needsLoad ? Duration.zero : _engine.bufferedPosition,
       speed: _engine.speed,
       errorMessage: _errorMessage,
       queueIndex: _queue.isEmpty ? null : _queue.position,

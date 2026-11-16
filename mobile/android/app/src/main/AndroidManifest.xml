@@ -3,7 +3,9 @@
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
-    <!-- Android 13+: needed to show the playback notification. -->
+    <!-- Android 13+: media-session notifications (the playback notification, lock screen
+         controls) are exempt from this runtime permission, so playback controls show without
+         a prompt. Declared so any future non-media notification can request it. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
 
     <application

@@ -10,7 +10,6 @@ import '../../widgets/common.dart';
 import '../../widgets/track_tile.dart';
 import '../library/library_providers.dart';
 import '../lyrics/lyrics_view.dart';
-import '../session/session_controller.dart';
 import 'player_providers.dart';
 import 'widgets/player_controls.dart';
 import 'widgets/seek_bar.dart';
@@ -135,12 +134,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             onChanged: (q) async {
               if (q == null) return;
               Navigator.pop(ctx);
-              try {
-                await ref.read(sessionProvider.notifier).updatePreferences(audioQuality: q);
-              } catch (e) {
-                await handler.setQuality(q); // still apply locally if saving the preference failed
-                if (context.mounted) showError(context, e);
-              }
+              // Applied immediately (current song reloads at the same position) and
+              // saved on the device by the handler.
+              await handler.setQuality(q);
             },
             child: Column(children: [
               for (final e in AppConfig.audioQualities.entries) RadioListTile<String>(value: e.key, title: Text(e.value)),

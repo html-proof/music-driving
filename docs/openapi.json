@@ -1,0 +1,4823 @@
+{
+ "openapi": "3.1.0",
+ "info": {
+  "title": "Melodia API",
+  "version": "1.0.0"
+ },
+ "paths": {
+  "/health": {
+   "get": {
+    "tags": [
+     "health"
+    ],
+    "summary": "Health",
+    "operationId": "health_health_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Health Health Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/health/ready": {
+   "get": {
+    "tags": [
+     "health"
+    ],
+    "summary": "Ready",
+    "operationId": "ready_health_ready_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/auth/device": {
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Create (first call) or resume this device's anonymous account",
+    "operationId": "device_auth_api_v1_auth_device_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DeviceAuthRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeviceAuthResponse"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/auth/refresh": {
+   "post": {
+    "tags": [
+     "auth"
+    ],
+    "summary": "Refresh",
+    "operationId": "refresh_api_v1_auth_refresh_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/RefreshRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/TokenPair"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/users/me": {
+   "get": {
+    "tags": [
+     "users"
+    ],
+    "summary": "Me",
+    "operationId": "me_api_v1_users_me_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UserOut"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   },
+   "delete": {
+    "tags": [
+     "users"
+    ],
+    "summary": "Delete Account",
+    "description": "Permanently deletes this device's account and all of its playlists, likes, history and\nsessions. The app then starts over with a fresh anonymous account.",
+    "operationId": "delete_account_api_v1_users_me_delete",
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   },
+   "patch": {
+    "tags": [
+     "users"
+    ],
+    "summary": "Update Profile",
+    "operationId": "update_profile_api_v1_users_me_patch",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProfileUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UserOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/v1/users/me/preferences": {
+   "get": {
+    "tags": [
+     "users"
+    ],
+    "summary": "Get Preferences",
+    "operationId": "get_preferences_api_v1_users_me_preferences_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Preferences"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   },
+   "patch": {
+    "tags": [
+     "users"
+    ],
+    "summary": "Update Preferences",
+    "operationId": "update_preferences_api_v1_users_me_preferences_patch",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PreferencesUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Preferences"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/v1/users/me/notifications": {
+   "get": {
+    "tags": [
+     "users"
+    ],
+    "summary": "Get Notifications",
+    "operationId": "get_notifications_api_v1_users_me_notifications_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/NotificationPrefs"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   },
+   "patch": {
+    "tags": [
+     "users"
+    ],
+    "summary": "Update Notifications",
+    "operationId": "update_notifications_api_v1_users_me_notifications_patch",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/NotificationPrefsUpdate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/NotificationPrefs"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/v1/users/me/devices": {
+   "get": {
+    "tags": [
+     "users"
+    ],
+    "summary": "List Devices",
+    "operationId": "list_devices_api_v1_users_me_devices_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/DeviceOut"
+         },
+         "type": "array",
+         "title": "Response List Devices Api V1 Users Me Devices Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   },
+   "put": {
+    "tags": [
+     "users"
+    ],
+    "summary": "Register Device",
+    "operationId": "register_device_api_v1_users_me_devices_put",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/DeviceRegister"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/DeviceOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/v1/home": {
+   "get": {
+    "tags": [
+     "music"
+    ],
+    "summary": "Home",
+    "operationId": "home_api_v1_home_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "languages",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Comma separated, overrides user preferences",
+       "title": "Languages"
+      },
+      "description": "Comma separated, overrides user preferences"
+     },
+     {
+      "name": "x-timezone",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "IANA timezone for the greeting",
+       "title": "X-Timezone"
+      },
+      "description": "IANA timezone for the greeting"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HomeFeed"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/search": {
+   "get": {
+    "tags": [
+     "music"
+    ],
+    "summary": "Search",
+    "operationId": "search_api_v1_search_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "q",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "Q"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 30,
+       "minimum": 1,
+       "default": 10,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "save",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "description": "Store in the user's search history",
+       "default": false,
+       "title": "Save"
+      },
+      "description": "Store in the user's search history"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SearchResults"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/songs/{seokey}": {
+   "get": {
+    "tags": [
+     "music"
+    ],
+    "summary": "Song",
+    "operationId": "song_api_v1_songs__seokey__get",
+    "parameters": [
+     {
+      "name": "seokey",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "pattern": "^[A-Za-z0-9\\-]+$",
+       "title": "Seokey"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Track"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/albums/{seokey}": {
+   "get": {
+    "tags": [
+     "music"
+    ],
+    "summary": "Album",
+    "operationId": "album_api_v1_albums__seokey__get",
+    "parameters": [
+     {
+      "name": "seokey",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "pattern": "^[A-Za-z0-9\\-]+$",
+       "title": "Seokey"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AlbumDetail"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/albums/{album_id}/similar": {
+   "get": {
+    "tags": [
+     "music"
+    ],
+    "summary": "Similar Albums",
+    "operationId": "similar_albums_api_v1_albums__album_id__similar_get",
+    "parameters": [
+     {
+      "name": "album_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 20,
+       "pattern": "^[0-9]+$",
+       "title": "Album Id"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 30,
+       "minimum": 1,
+       "default": 10,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/AlbumSummary"
+         },
+         "title": "Response Similar Albums Api V1 Albums  Album Id  Similar Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/artists/{seokey}": {
+   "get": {
+    "tags": [
+     "music"
+    ],
+    "summary": "Artist",
+    "operationId": "artist_api_v1_artists__seokey__get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "seokey",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "pattern": "^[A-Za-z0-9\\-]+$",
+       "title": "Seokey"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 50,
+       "minimum": 1,
+       "default": 10,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ArtistDetail"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/artists/{artist_id}/tracks": {
+   "get": {
+    "tags": [
+     "music"
+    ],
+    "summary": "Artist Tracks",
+    "operationId": "artist_tracks_api_v1_artists__artist_id__tracks_get",
+    "parameters": [
+     {
+      "name": "artist_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 20,
+       "pattern": "^[0-9]+$",
+       "title": "Artist Id"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 50,
+       "minimum": 1,
+       "default": 20,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "page",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 1000,
+       "minimum": 1,
+       "default": 1,
+       "title": "Page"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/TrackPage"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/playlists/{seokey}": {
+   "get": {
+    "tags": [
+     "music"
+    ],
+    "summary": "Provider (editorial/chart) playlist. Read user playlists via /library/playlists/{id}.",
+    "operationId": "provider_playlist_api_v1_playlists__seokey__get",
+    "parameters": [
+     {
+      "name": "seokey",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "pattern": "^[A-Za-z0-9\\-]+$",
+       "title": "Seokey"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PlaylistDetail"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/trending": {
+   "get": {
+    "tags": [
+     "music"
+    ],
+    "summary": "Trending",
+    "operationId": "trending_api_v1_trending_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "language",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "minLength": 2,
+         "maxLength": 50,
+         "pattern": "^[A-Za-z]+(?: [A-Za-z]+)*$"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Language"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 50,
+       "minimum": 1,
+       "default": 20,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/Track"
+         },
+         "title": "Response Trending Api V1 Trending Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/new-releases": {
+   "get": {
+    "tags": [
+     "music"
+    ],
+    "summary": "New Releases",
+    "operationId": "new_releases_api_v1_new_releases_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "language",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "minLength": 2,
+         "maxLength": 50,
+         "pattern": "^[A-Za-z]+(?: [A-Za-z]+)*$"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Language"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 50,
+       "minimum": 1,
+       "default": 20,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/NewReleases"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/charts": {
+   "get": {
+    "tags": [
+     "music"
+    ],
+    "summary": "Charts",
+    "operationId": "charts_api_v1_charts_get",
+    "parameters": [
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 50,
+       "minimum": 1,
+       "default": 20,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/PlaylistSummary"
+         },
+         "title": "Response Charts Api V1 Charts Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/library/liked/{song_id}": {
+   "post": {
+    "tags": [
+     "library"
+    ],
+    "summary": "Like",
+    "operationId": "like_api_v1_library_liked__song_id__post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "song_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "pattern": "^[A-Za-z0-9\\-]+$",
+       "title": "Song Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LikeStatus"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "library"
+    ],
+    "summary": "Unlike",
+    "operationId": "unlike_api_v1_library_liked__song_id__delete",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "song_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "pattern": "^[A-Za-z0-9\\-]+$",
+       "title": "Song Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LikeStatus"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/library/liked": {
+   "get": {
+    "tags": [
+     "library"
+    ],
+    "summary": "Liked",
+    "operationId": "liked_api_v1_library_liked_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "offset",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0,
+       "title": "Offset"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 200,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/LikedPage"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/library/liked/status": {
+   "get": {
+    "tags": [
+     "library"
+    ],
+    "summary": "Liked Status",
+    "operationId": "liked_status_api_v1_library_liked_status_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "ids",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "maxLength": 5000,
+       "description": "Comma separated song ids",
+       "title": "Ids"
+      },
+      "description": "Comma separated song ids"
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": {
+          "type": "boolean"
+         },
+         "title": "Response Liked Status Api V1 Library Liked Status Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/library/followed-artists": {
+   "get": {
+    "tags": [
+     "library"
+    ],
+    "summary": "Followed",
+    "operationId": "followed_api_v1_library_followed_artists_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/FollowedArtistOut"
+         },
+         "type": "array",
+         "title": "Response Followed Api V1 Library Followed Artists Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/v1/library/followed-artists/{artist_id}": {
+   "post": {
+    "tags": [
+     "library"
+    ],
+    "summary": "Follow",
+    "operationId": "follow_api_v1_library_followed_artists__artist_id__post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "artist_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "pattern": "^[A-Za-z0-9\\-]+$",
+       "title": "Artist Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "library"
+    ],
+    "summary": "Unfollow",
+    "operationId": "unfollow_api_v1_library_followed_artists__artist_id__delete",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "artist_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "pattern": "^[A-Za-z0-9\\-]+$",
+       "title": "Artist Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/library/recently-played": {
+   "get": {
+    "tags": [
+     "library"
+    ],
+    "summary": "Recently Played",
+    "operationId": "recently_played_api_v1_library_recently_played_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 50,
+       "minimum": 1,
+       "default": 20,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/Track"
+         },
+         "title": "Response Recently Played Api V1 Library Recently Played Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/library/history": {
+   "get": {
+    "tags": [
+     "library"
+    ],
+    "summary": "History",
+    "operationId": "history_api_v1_library_history_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "offset",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0,
+       "title": "Offset"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 200,
+       "minimum": 1,
+       "default": 50,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HistoryPage"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "library"
+    ],
+    "summary": "Clear History",
+    "operationId": "clear_history_api_v1_library_history_delete",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     }
+    }
+   }
+  },
+  "/api/v1/library/search-history": {
+   "get": {
+    "tags": [
+     "library"
+    ],
+    "summary": "Search History",
+    "operationId": "search_history_api_v1_library_search_history_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 50,
+       "minimum": 1,
+       "default": 20,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "additionalProperties": true
+         },
+         "title": "Response Search History Api V1 Library Search History Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "library"
+    ],
+    "summary": "Clear Search History",
+    "operationId": "clear_search_history_api_v1_library_search_history_delete",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "entry_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Entry Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/recommendations": {
+   "get": {
+    "tags": [
+     "library"
+    ],
+    "summary": "Recommendations",
+    "operationId": "recommendations_api_v1_recommendations_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 50,
+       "minimum": 1,
+       "default": 30,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Recommendations"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/library/playlists": {
+   "get": {
+    "tags": [
+     "library"
+    ],
+    "summary": "My Playlists",
+    "operationId": "my_playlists_api_v1_library_playlists_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/UserPlaylistSummary"
+         },
+         "type": "array",
+         "title": "Response My Playlists Api V1 Library Playlists Get"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/v1/library/playlists/{playlist_id}": {
+   "get": {
+    "tags": [
+     "library"
+    ],
+    "summary": "My Playlist",
+    "operationId": "my_playlist_api_v1_library_playlists__playlist_id__get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "playlist_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Playlist Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UserPlaylistDetail"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/playlists": {
+   "post": {
+    "tags": [
+     "library"
+    ],
+    "summary": "Create Playlist",
+    "operationId": "create_playlist_api_v1_playlists_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PlaylistCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UserPlaylistDetail"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/v1/playlists/{playlist_id}": {
+   "put": {
+    "tags": [
+     "library"
+    ],
+    "summary": "Update Playlist",
+    "operationId": "update_playlist_api_v1_playlists__playlist_id__put",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "playlist_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Playlist Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PlaylistUpdate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UserPlaylistDetail"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "library"
+    ],
+    "summary": "Delete Playlist",
+    "operationId": "delete_playlist_api_v1_playlists__playlist_id__delete",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "playlist_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Playlist Id"
+      }
+     }
+    ],
+    "responses": {
+     "204": {
+      "description": "Successful Response"
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/playlists/{playlist_id}/songs": {
+   "post": {
+    "tags": [
+     "library"
+    ],
+    "summary": "Add Songs",
+    "operationId": "add_songs_api_v1_playlists__playlist_id__songs_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "playlist_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Playlist Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PlaylistAddSongs"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AddSongsResult"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/playlists/{playlist_id}/songs/{song_id}": {
+   "delete": {
+    "tags": [
+     "library"
+    ],
+    "summary": "Remove Song",
+    "operationId": "remove_song_api_v1_playlists__playlist_id__songs__song_id__delete",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "playlist_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Playlist Id"
+      }
+     },
+     {
+      "name": "song_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "pattern": "^[A-Za-z0-9\\-]+$",
+       "title": "Song Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UserPlaylistDetail"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/playlists/{playlist_id}/order": {
+   "put": {
+    "tags": [
+     "library"
+    ],
+    "summary": "Reorder",
+    "operationId": "reorder_api_v1_playlists__playlist_id__order_put",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "playlist_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Playlist Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PlaylistReorder"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/UserPlaylistDetail"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/playback/session": {
+   "post": {
+    "tags": [
+     "playback"
+    ],
+    "summary": "Upsert Session",
+    "description": "Create or replace this device's playback session (queue, position, shuffle/repeat).",
+    "operationId": "upsert_session_api_v1_playback_session_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PlaybackSessionIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PlaybackSessionOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/v1/playback/stream/{song_id}": {
+   "get": {
+    "tags": [
+     "playback"
+    ],
+    "summary": "Stream",
+    "description": "Resolve a fresh, verified HLS URL. The app streams directly from the provider CDN;\nthe backend never proxies or stores audio. Call again before `expires_at`.",
+    "operationId": "stream_api_v1_playback_stream__song_id__get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "song_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "pattern": "^[A-Za-z0-9\\-]+$",
+       "title": "Song Id"
+      }
+     },
+     {
+      "name": "quality",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "$ref": "#/components/schemas/AudioQuality"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Quality"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/StreamInfo"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/playback/progress": {
+   "post": {
+    "tags": [
+     "playback"
+    ],
+    "summary": "Progress",
+    "operationId": "progress_api_v1_playback_progress_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ProgressIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "anyOf": [
+          {
+           "$ref": "#/components/schemas/PlaybackSessionOut"
+          },
+          {
+           "type": "null"
+          }
+         ],
+         "title": "Response Progress Api V1 Playback Progress Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/v1/playback/complete": {
+   "post": {
+    "tags": [
+     "playback"
+    ],
+    "summary": "Complete",
+    "operationId": "complete_api_v1_playback_complete_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CompleteIn"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Complete Api V1 Playback Complete Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    },
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ]
+   }
+  },
+  "/api/v1/playback/queue": {
+   "get": {
+    "tags": [
+     "playback"
+    ],
+    "summary": "Queue",
+    "operationId": "queue_api_v1_playback_queue_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string",
+         "format": "uuid"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Session Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/QueueOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/lyrics/{song_id}": {
+   "get": {
+    "tags": [
+     "playback",
+     "lyrics"
+    ],
+    "summary": "Lyrics",
+    "operationId": "lyrics_api_v1_lyrics__song_id__get",
+    "parameters": [
+     {
+      "name": "song_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "pattern": "^[A-Za-z0-9\\-]+$",
+       "title": "Song Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Lyrics"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "components": {
+  "schemas": {
+   "AddSongsResult": {
+    "properties": {
+     "added": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Added"
+     },
+     "already_present": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Already Present"
+     },
+     "failed": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "type": "object",
+      "title": "Failed"
+     },
+     "playlist": {
+      "$ref": "#/components/schemas/UserPlaylistDetail"
+     }
+    },
+    "type": "object",
+    "required": [
+     "added",
+     "already_present",
+     "failed",
+     "playlist"
+    ],
+    "title": "AddSongsResult"
+   },
+   "AlbumDetail": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "numeric_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Numeric Id"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "artists": {
+      "items": {
+       "$ref": "#/components/schemas/ArtistRef"
+      },
+      "type": "array",
+      "title": "Artists",
+      "default": []
+     },
+     "artwork": {
+      "$ref": "#/components/schemas/Artwork",
+      "default": {}
+     },
+     "release_date": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Release Date"
+     },
+     "language": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Language"
+     },
+     "track_count": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Track Count"
+     },
+     "is_explicit": {
+      "type": "boolean",
+      "title": "Is Explicit",
+      "default": false
+     },
+     "label": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Label"
+     },
+     "duration": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Duration"
+     },
+     "tracks": {
+      "items": {
+       "$ref": "#/components/schemas/Track"
+      },
+      "type": "array",
+      "title": "Tracks",
+      "default": []
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "title"
+    ],
+    "title": "AlbumDetail"
+   },
+   "AlbumRef": {
+    "properties": {
+     "id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Id"
+     },
+     "numeric_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Numeric Id"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     }
+    },
+    "type": "object",
+    "required": [
+     "title"
+    ],
+    "title": "AlbumRef"
+   },
+   "AlbumSummary": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "numeric_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Numeric Id"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "artists": {
+      "items": {
+       "$ref": "#/components/schemas/ArtistRef"
+      },
+      "type": "array",
+      "title": "Artists",
+      "default": []
+     },
+     "artwork": {
+      "$ref": "#/components/schemas/Artwork",
+      "default": {}
+     },
+     "release_date": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Release Date"
+     },
+     "language": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Language"
+     },
+     "track_count": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Track Count"
+     },
+     "is_explicit": {
+      "type": "boolean",
+      "title": "Is Explicit",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "title"
+    ],
+    "title": "AlbumSummary"
+   },
+   "ArtistDetail": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "numeric_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Numeric Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "artwork": {
+      "$ref": "#/components/schemas/Artwork",
+      "default": {}
+     },
+     "song_count": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Song Count"
+     },
+     "album_count": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Album Count"
+     },
+     "follower_count": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Follower Count"
+     },
+     "top_tracks": {
+      "items": {
+       "$ref": "#/components/schemas/Track"
+      },
+      "type": "array",
+      "title": "Top Tracks",
+      "default": []
+     },
+     "total_tracks": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Total Tracks"
+     },
+     "similar_artists": {
+      "items": {
+       "$ref": "#/components/schemas/ArtistSummary"
+      },
+      "type": "array",
+      "title": "Similar Artists",
+      "default": []
+     },
+     "is_followed": {
+      "type": "boolean",
+      "title": "Is Followed",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name"
+    ],
+    "title": "ArtistDetail"
+   },
+   "ArtistRef": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Id",
+      "description": "Provider seokey, when known"
+     },
+     "numeric_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Numeric Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "name"
+    ],
+    "title": "ArtistRef"
+   },
+   "ArtistSummary": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "numeric_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Numeric Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "artwork": {
+      "$ref": "#/components/schemas/Artwork",
+      "default": {}
+     },
+     "song_count": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Song Count"
+     },
+     "album_count": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Album Count"
+     },
+     "follower_count": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Follower Count"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name"
+    ],
+    "title": "ArtistSummary"
+   },
+   "Artwork": {
+    "properties": {
+     "small": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Small"
+     },
+     "medium": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Medium"
+     },
+     "large": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Large"
+     }
+    },
+    "type": "object",
+    "title": "Artwork"
+   },
+   "AudioQuality": {
+    "type": "string",
+    "enum": [
+     "low",
+     "medium",
+     "high",
+     "very_high"
+    ],
+    "title": "AudioQuality"
+   },
+   "CompleteIn": {
+    "properties": {
+     "session_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Session Id"
+     },
+     "song_id": {
+      "type": "string",
+      "title": "Song Id"
+     },
+     "seconds_listened": {
+      "type": "number",
+      "minimum": 0.0,
+      "title": "Seconds Listened"
+     },
+     "completed": {
+      "type": "boolean",
+      "title": "Completed",
+      "description": "False when skipped before the end",
+      "default": true
+     },
+     "context": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 100
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Context"
+     }
+    },
+    "type": "object",
+    "required": [
+     "song_id",
+     "seconds_listened"
+    ],
+    "title": "CompleteIn"
+   },
+   "DeviceAuthRequest": {
+    "properties": {
+     "device_id": {
+      "type": "string",
+      "maxLength": 128,
+      "minLength": 16,
+      "pattern": "^[A-Za-z0-9\\-_]+$",
+      "title": "Device Id",
+      "description": "Random id generated by the app on first launch"
+     },
+     "device_secret": {
+      "type": "string",
+      "maxLength": 256,
+      "minLength": 32,
+      "title": "Device Secret",
+      "description": "Random secret (>=256 bits) kept in the device keystore"
+     },
+     "platform": {
+      "type": "string",
+      "pattern": "^(android|ios|web|other)$",
+      "title": "Platform",
+      "default": "other"
+     },
+     "name": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 100
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     }
+    },
+    "type": "object",
+    "required": [
+     "device_id",
+     "device_secret"
+    ],
+    "title": "DeviceAuthRequest"
+   },
+   "DeviceAuthResponse": {
+    "properties": {
+     "access_token": {
+      "type": "string",
+      "title": "Access Token"
+     },
+     "refresh_token": {
+      "type": "string",
+      "title": "Refresh Token"
+     },
+     "token_type": {
+      "type": "string",
+      "title": "Token Type",
+      "default": "bearer"
+     },
+     "expires_in": {
+      "type": "integer",
+      "title": "Expires In",
+      "description": "Access token lifetime in seconds"
+     },
+     "created": {
+      "type": "boolean",
+      "title": "Created",
+      "description": "True when this call created the device's account"
+     }
+    },
+    "type": "object",
+    "required": [
+     "access_token",
+     "refresh_token",
+     "expires_in",
+     "created"
+    ],
+    "title": "DeviceAuthResponse"
+   },
+   "DeviceOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "installation_id": {
+      "type": "string",
+      "title": "Installation Id"
+     },
+     "platform": {
+      "type": "string",
+      "title": "Platform"
+     },
+     "name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "has_push_token": {
+      "type": "boolean",
+      "title": "Has Push Token"
+     },
+     "last_seen_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Last Seen At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "installation_id",
+     "platform",
+     "name",
+     "has_push_token",
+     "last_seen_at"
+    ],
+    "title": "DeviceOut"
+   },
+   "DeviceRegister": {
+    "properties": {
+     "installation_id": {
+      "type": "string",
+      "maxLength": 128,
+      "minLength": 8,
+      "title": "Installation Id"
+     },
+     "platform": {
+      "type": "string",
+      "pattern": "^(android|ios|web|other)$",
+      "title": "Platform"
+     },
+     "name": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 100
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "push_token": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 512
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Push Token"
+     }
+    },
+    "type": "object",
+    "required": [
+     "installation_id",
+     "platform"
+    ],
+    "title": "DeviceRegister"
+   },
+   "FollowedArtistOut": {
+    "properties": {
+     "artist": {
+      "$ref": "#/components/schemas/ArtistSummary"
+     },
+     "followed_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Followed At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "artist",
+     "followed_at"
+    ],
+    "title": "FollowedArtistOut"
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "type": "array",
+      "title": "Detail"
+     }
+    },
+    "type": "object",
+    "title": "HTTPValidationError"
+   },
+   "HistoryEntry": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "track": {
+      "$ref": "#/components/schemas/Track"
+     },
+     "played_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Played At"
+     },
+     "seconds_listened": {
+      "type": "number",
+      "title": "Seconds Listened"
+     },
+     "completed": {
+      "type": "boolean",
+      "title": "Completed"
+     },
+     "context": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Context"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "track",
+     "played_at",
+     "seconds_listened",
+     "completed"
+    ],
+    "title": "HistoryEntry"
+   },
+   "HistoryPage": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/HistoryEntry"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "offset": {
+      "type": "integer",
+      "title": "Offset"
+     },
+     "limit": {
+      "type": "integer",
+      "title": "Limit"
+     },
+     "has_more": {
+      "type": "boolean",
+      "title": "Has More"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items",
+     "offset",
+     "limit",
+     "has_more"
+    ],
+    "title": "HistoryPage"
+   },
+   "HomeFeed": {
+    "properties": {
+     "greeting": {
+      "type": "string",
+      "title": "Greeting"
+     },
+     "languages": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Languages"
+     },
+     "sections": {
+      "items": {
+       "$ref": "#/components/schemas/HomeSection"
+      },
+      "type": "array",
+      "title": "Sections"
+     },
+     "errors": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "type": "object",
+      "title": "Errors",
+      "default": {}
+     }
+    },
+    "type": "object",
+    "required": [
+     "greeting",
+     "languages",
+     "sections"
+    ],
+    "title": "HomeFeed"
+   },
+   "HomeSection": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "subtitle": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Subtitle"
+     },
+     "type": {
+      "type": "string",
+      "title": "Type",
+      "description": "tracks | albums | artists | playlists"
+     },
+     "tracks": {
+      "items": {
+       "$ref": "#/components/schemas/Track"
+      },
+      "type": "array",
+      "title": "Tracks",
+      "default": []
+     },
+     "albums": {
+      "items": {
+       "$ref": "#/components/schemas/AlbumSummary"
+      },
+      "type": "array",
+      "title": "Albums",
+      "default": []
+     },
+     "artists": {
+      "items": {
+       "$ref": "#/components/schemas/ArtistSummary"
+      },
+      "type": "array",
+      "title": "Artists",
+      "default": []
+     },
+     "playlists": {
+      "items": {
+       "$ref": "#/components/schemas/PlaylistSummary"
+      },
+      "type": "array",
+      "title": "Playlists",
+      "default": []
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "title",
+     "type"
+    ],
+    "title": "HomeSection"
+   },
+   "LikeStatus": {
+    "properties": {
+     "song_id": {
+      "type": "string",
+      "title": "Song Id"
+     },
+     "liked": {
+      "type": "boolean",
+      "title": "Liked"
+     }
+    },
+    "type": "object",
+    "required": [
+     "song_id",
+     "liked"
+    ],
+    "title": "LikeStatus"
+   },
+   "LikedPage": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/LikedSongOut"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "total": {
+      "type": "integer",
+      "title": "Total"
+     },
+     "offset": {
+      "type": "integer",
+      "title": "Offset"
+     },
+     "limit": {
+      "type": "integer",
+      "title": "Limit"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items",
+     "total",
+     "offset",
+     "limit"
+    ],
+    "title": "LikedPage"
+   },
+   "LikedSongOut": {
+    "properties": {
+     "track": {
+      "$ref": "#/components/schemas/Track"
+     },
+     "liked_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Liked At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "track",
+     "liked_at"
+    ],
+    "title": "LikedSongOut"
+   },
+   "LyricLine": {
+    "properties": {
+     "time_ms": {
+      "type": "integer",
+      "title": "Time Ms"
+     },
+     "text": {
+      "type": "string",
+      "title": "Text"
+     }
+    },
+    "type": "object",
+    "required": [
+     "time_ms",
+     "text"
+    ],
+    "title": "LyricLine"
+   },
+   "Lyrics": {
+    "properties": {
+     "song_id": {
+      "type": "string",
+      "title": "Song Id"
+     },
+     "available": {
+      "type": "boolean",
+      "title": "Available"
+     },
+     "synced": {
+      "type": "boolean",
+      "title": "Synced",
+      "description": "True only when the source supplied real timestamps"
+     },
+     "instrumental": {
+      "type": "boolean",
+      "title": "Instrumental",
+      "default": false
+     },
+     "lines": {
+      "items": {
+       "$ref": "#/components/schemas/LyricLine"
+      },
+      "type": "array",
+      "title": "Lines",
+      "default": []
+     },
+     "plain_text": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Plain Text"
+     },
+     "source": {
+      "type": "string",
+      "title": "Source"
+     },
+     "source_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Source Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "song_id",
+     "available",
+     "synced",
+     "source"
+    ],
+    "title": "Lyrics"
+   },
+   "NewReleases": {
+    "properties": {
+     "language": {
+      "type": "string",
+      "title": "Language"
+     },
+     "tracks": {
+      "items": {
+       "$ref": "#/components/schemas/Track"
+      },
+      "type": "array",
+      "title": "Tracks",
+      "default": []
+     },
+     "albums": {
+      "items": {
+       "$ref": "#/components/schemas/AlbumSummary"
+      },
+      "type": "array",
+      "title": "Albums",
+      "default": []
+     }
+    },
+    "type": "object",
+    "required": [
+     "language"
+    ],
+    "title": "NewReleases"
+   },
+   "NotificationPrefs": {
+    "properties": {
+     "new_releases": {
+      "type": "boolean",
+      "title": "New Releases",
+      "default": true
+     },
+     "recommendations": {
+      "type": "boolean",
+      "title": "Recommendations",
+      "default": true
+     },
+     "followed_artists": {
+      "type": "boolean",
+      "title": "Followed Artists",
+      "default": true
+     }
+    },
+    "type": "object",
+    "title": "NotificationPrefs"
+   },
+   "NotificationPrefsUpdate": {
+    "properties": {
+     "new_releases": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "New Releases"
+     },
+     "recommendations": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Recommendations"
+     },
+     "followed_artists": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Followed Artists"
+     }
+    },
+    "type": "object",
+    "title": "NotificationPrefsUpdate"
+   },
+   "PlaybackSessionIn": {
+    "properties": {
+     "queue": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "maxItems": 500,
+      "title": "Queue",
+      "description": "Provider song ids",
+      "default": []
+     },
+     "current_index": {
+      "type": "integer",
+      "minimum": 0.0,
+      "title": "Current Index",
+      "default": 0
+     },
+     "position_seconds": {
+      "type": "number",
+      "minimum": 0.0,
+      "title": "Position Seconds",
+      "default": 0
+     },
+     "shuffle": {
+      "type": "boolean",
+      "title": "Shuffle",
+      "default": false
+     },
+     "repeat_mode": {
+      "type": "string",
+      "pattern": "^(off|all|one)$",
+      "title": "Repeat Mode",
+      "default": "off"
+     },
+     "quality": {
+      "$ref": "#/components/schemas/AudioQuality",
+      "default": "high"
+     },
+     "context": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 100
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Context"
+     },
+     "installation_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Installation Id"
+     }
+    },
+    "type": "object",
+    "title": "PlaybackSessionIn"
+   },
+   "PlaybackSessionOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "queue": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Queue"
+     },
+     "current_index": {
+      "type": "integer",
+      "title": "Current Index"
+     },
+     "position_seconds": {
+      "type": "number",
+      "title": "Position Seconds"
+     },
+     "shuffle": {
+      "type": "boolean",
+      "title": "Shuffle"
+     },
+     "repeat_mode": {
+      "type": "string",
+      "title": "Repeat Mode"
+     },
+     "quality": {
+      "$ref": "#/components/schemas/AudioQuality"
+     },
+     "context": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Context"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Updated At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "queue",
+     "current_index",
+     "position_seconds",
+     "shuffle",
+     "repeat_mode",
+     "quality",
+     "context",
+     "updated_at"
+    ],
+    "title": "PlaybackSessionOut"
+   },
+   "PlaylistAddSongs": {
+    "properties": {
+     "song_ids": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "maxItems": 100,
+      "minItems": 1,
+      "title": "Song Ids",
+      "description": "Provider song ids (seokeys)"
+     }
+    },
+    "type": "object",
+    "required": [
+     "song_ids"
+    ],
+    "title": "PlaylistAddSongs"
+   },
+   "PlaylistCreate": {
+    "properties": {
+     "name": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Name"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "is_public": {
+      "type": "boolean",
+      "title": "Is Public",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "name"
+    ],
+    "title": "PlaylistCreate"
+   },
+   "PlaylistDetail": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "numeric_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Numeric Id"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "language": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Language"
+     },
+     "artwork": {
+      "$ref": "#/components/schemas/Artwork",
+      "default": {}
+     },
+     "play_count": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Play Count"
+     },
+     "is_explicit": {
+      "type": "boolean",
+      "title": "Is Explicit",
+      "default": false
+     },
+     "tracks": {
+      "items": {
+       "$ref": "#/components/schemas/Track"
+      },
+      "type": "array",
+      "title": "Tracks",
+      "default": []
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "title"
+    ],
+    "title": "PlaylistDetail"
+   },
+   "PlaylistReorder": {
+    "properties": {
+     "song_ids": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Song Ids",
+      "description": "Full list of the playlist's song ids in the new order"
+     }
+    },
+    "type": "object",
+    "required": [
+     "song_ids"
+    ],
+    "title": "PlaylistReorder"
+   },
+   "PlaylistSummary": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "numeric_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Numeric Id"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "language": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Language"
+     },
+     "artwork": {
+      "$ref": "#/components/schemas/Artwork",
+      "default": {}
+     },
+     "play_count": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Play Count"
+     },
+     "is_explicit": {
+      "type": "boolean",
+      "title": "Is Explicit",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "title"
+    ],
+    "title": "PlaylistSummary"
+   },
+   "PlaylistUpdate": {
+    "properties": {
+     "name": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 200,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Name"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "is_public": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Is Public"
+     }
+    },
+    "type": "object",
+    "title": "PlaylistUpdate"
+   },
+   "Preferences": {
+    "properties": {
+     "languages": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Languages",
+      "default": []
+     },
+     "audio_quality": {
+      "type": "string",
+      "title": "Audio Quality",
+      "default": "high"
+     },
+     "allow_explicit": {
+      "type": "boolean",
+      "title": "Allow Explicit",
+      "default": true
+     }
+    },
+    "type": "object",
+    "title": "Preferences"
+   },
+   "PreferencesUpdate": {
+    "properties": {
+     "languages": {
+      "anyOf": [
+       {
+        "items": {
+         "type": "string"
+        },
+        "type": "array",
+        "maxItems": 10
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Languages"
+     },
+     "audio_quality": {
+      "anyOf": [
+       {
+        "type": "string",
+        "pattern": "^(low|medium|high|very_high)$"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Audio Quality"
+     },
+     "allow_explicit": {
+      "anyOf": [
+       {
+        "type": "boolean"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Allow Explicit"
+     }
+    },
+    "type": "object",
+    "title": "PreferencesUpdate"
+   },
+   "ProfileUpdate": {
+    "properties": {
+     "display_name": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 100,
+        "minLength": 1
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Display Name"
+     },
+     "avatar_url": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 1024
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Avatar Url"
+     },
+     "country": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 2,
+        "minLength": 2
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Country"
+     }
+    },
+    "type": "object",
+    "title": "ProfileUpdate"
+   },
+   "ProgressIn": {
+    "properties": {
+     "session_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Session Id"
+     },
+     "song_id": {
+      "type": "string",
+      "title": "Song Id"
+     },
+     "position_seconds": {
+      "type": "number",
+      "minimum": 0.0,
+      "title": "Position Seconds"
+     },
+     "current_index": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "minimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Current Index"
+     }
+    },
+    "type": "object",
+    "required": [
+     "song_id",
+     "position_seconds"
+    ],
+    "title": "ProgressIn"
+   },
+   "QueueOut": {
+    "properties": {
+     "session_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Session Id"
+     },
+     "current_index": {
+      "type": "integer",
+      "title": "Current Index"
+     },
+     "position_seconds": {
+      "type": "number",
+      "title": "Position Seconds"
+     },
+     "shuffle": {
+      "type": "boolean",
+      "title": "Shuffle"
+     },
+     "repeat_mode": {
+      "type": "string",
+      "title": "Repeat Mode"
+     },
+     "quality": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/AudioQuality"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "tracks": {
+      "items": {
+       "$ref": "#/components/schemas/Track"
+      },
+      "type": "array",
+      "title": "Tracks"
+     },
+     "unavailable": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Unavailable",
+      "description": "Queue ids whose metadata could not be loaded",
+      "default": []
+     }
+    },
+    "type": "object",
+    "required": [
+     "session_id",
+     "current_index",
+     "position_seconds",
+     "shuffle",
+     "repeat_mode",
+     "quality",
+     "tracks"
+    ],
+    "title": "QueueOut"
+   },
+   "Recommendation": {
+    "properties": {
+     "track": {
+      "$ref": "#/components/schemas/Track"
+     },
+     "reason": {
+      "type": "string",
+      "title": "Reason"
+     }
+    },
+    "type": "object",
+    "required": [
+     "track",
+     "reason"
+    ],
+    "title": "Recommendation"
+   },
+   "Recommendations": {
+    "properties": {
+     "personalized": {
+      "type": "boolean",
+      "title": "Personalized"
+     },
+     "message": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Message"
+     },
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/Recommendation"
+      },
+      "type": "array",
+      "title": "Items",
+      "default": []
+     },
+     "based_on": {
+      "additionalProperties": {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      "type": "object",
+      "title": "Based On",
+      "default": {}
+     }
+    },
+    "type": "object",
+    "required": [
+     "personalized"
+    ],
+    "title": "Recommendations"
+   },
+   "RefreshRequest": {
+    "properties": {
+     "refresh_token": {
+      "type": "string",
+      "minLength": 10,
+      "title": "Refresh Token"
+     }
+    },
+    "type": "object",
+    "required": [
+     "refresh_token"
+    ],
+    "title": "RefreshRequest"
+   },
+   "SearchResults": {
+    "properties": {
+     "query": {
+      "type": "string",
+      "title": "Query"
+     },
+     "songs": {
+      "items": {
+       "$ref": "#/components/schemas/Track"
+      },
+      "type": "array",
+      "title": "Songs",
+      "default": []
+     },
+     "albums": {
+      "items": {
+       "$ref": "#/components/schemas/AlbumSummary"
+      },
+      "type": "array",
+      "title": "Albums",
+      "default": []
+     },
+     "artists": {
+      "items": {
+       "$ref": "#/components/schemas/ArtistSummary"
+      },
+      "type": "array",
+      "title": "Artists",
+      "default": []
+     },
+     "playlists": {
+      "items": {
+       "$ref": "#/components/schemas/PlaylistSummary"
+      },
+      "type": "array",
+      "title": "Playlists",
+      "default": []
+     },
+     "errors": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "type": "object",
+      "title": "Errors",
+      "description": "Per-section provider failures (section -> message)"
+     }
+    },
+    "type": "object",
+    "required": [
+     "query"
+    ],
+    "title": "SearchResults"
+   },
+   "StreamInfo": {
+    "properties": {
+     "song_id": {
+      "type": "string",
+      "title": "Song Id"
+     },
+     "quality": {
+      "$ref": "#/components/schemas/AudioQuality"
+     },
+     "requested_quality": {
+      "$ref": "#/components/schemas/AudioQuality"
+     },
+     "url": {
+      "type": "string",
+      "title": "Url"
+     },
+     "format": {
+      "type": "string",
+      "title": "Format",
+      "default": "hls"
+     },
+     "bitrate_kbps": {
+      "type": "integer",
+      "title": "Bitrate Kbps"
+     },
+     "expires_at": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Expires At",
+      "description": "Refresh the URL (call this endpoint again) before this"
+     },
+     "available_qualities": {
+      "items": {
+       "$ref": "#/components/schemas/AudioQuality"
+      },
+      "type": "array",
+      "title": "Available Qualities"
+     }
+    },
+    "type": "object",
+    "required": [
+     "song_id",
+     "quality",
+     "requested_quality",
+     "url",
+     "bitrate_kbps",
+     "available_qualities"
+    ],
+    "title": "StreamInfo"
+   },
+   "TokenPair": {
+    "properties": {
+     "access_token": {
+      "type": "string",
+      "title": "Access Token"
+     },
+     "refresh_token": {
+      "type": "string",
+      "title": "Refresh Token"
+     },
+     "token_type": {
+      "type": "string",
+      "title": "Token Type",
+      "default": "bearer"
+     },
+     "expires_in": {
+      "type": "integer",
+      "title": "Expires In",
+      "description": "Access token lifetime in seconds"
+     }
+    },
+    "type": "object",
+    "required": [
+     "access_token",
+     "refresh_token",
+     "expires_in"
+    ],
+    "title": "TokenPair"
+   },
+   "Track": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id",
+      "description": "Provider song seokey; use it for every song_id path parameter"
+     },
+     "track_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Track Id"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "artists": {
+      "items": {
+       "$ref": "#/components/schemas/ArtistRef"
+      },
+      "type": "array",
+      "title": "Artists",
+      "default": []
+     },
+     "album": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/AlbumRef"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "duration": {
+      "type": "integer",
+      "title": "Duration",
+      "description": "Seconds",
+      "default": 0
+     },
+     "language": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Language"
+     },
+     "genres": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Genres",
+      "default": []
+     },
+     "is_explicit": {
+      "type": "boolean",
+      "title": "Is Explicit",
+      "default": false
+     },
+     "release_date": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Release Date"
+     },
+     "artwork": {
+      "$ref": "#/components/schemas/Artwork",
+      "default": {}
+     },
+     "playable": {
+      "type": "boolean",
+      "title": "Playable",
+      "description": "Provider returned a stream for this track",
+      "default": false
+     },
+     "provider_url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Provider Url"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "title"
+    ],
+    "title": "Track"
+   },
+   "TrackPage": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/Track"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "page": {
+      "type": "integer",
+      "title": "Page"
+     },
+     "limit": {
+      "type": "integer",
+      "title": "Limit"
+     },
+     "total": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Total"
+     },
+     "has_more": {
+      "type": "boolean",
+      "title": "Has More"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items",
+     "page",
+     "limit",
+     "has_more"
+    ],
+    "title": "TrackPage"
+   },
+   "UserOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "display_name": {
+      "type": "string",
+      "title": "Display Name"
+     },
+     "avatar_url": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Avatar Url"
+     },
+     "country": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Country"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "preferences": {
+      "$ref": "#/components/schemas/Preferences"
+     },
+     "notifications": {
+      "$ref": "#/components/schemas/NotificationPrefs"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "display_name",
+     "created_at",
+     "preferences",
+     "notifications"
+    ],
+    "title": "UserOut"
+   },
+   "UserPlaylistDetail": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "is_public": {
+      "type": "boolean",
+      "title": "Is Public"
+     },
+     "track_count": {
+      "type": "integer",
+      "title": "Track Count"
+     },
+     "artwork": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Artwork",
+      "description": "Up to 4 artwork URLs for a mosaic cover",
+      "default": []
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Updated At"
+     },
+     "owner_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Owner Id"
+     },
+     "tracks": {
+      "items": {
+       "$ref": "#/components/schemas/UserPlaylistEntry"
+      },
+      "type": "array",
+      "title": "Tracks"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "description",
+     "is_public",
+     "track_count",
+     "created_at",
+     "updated_at",
+     "owner_id",
+     "tracks"
+    ],
+    "title": "UserPlaylistDetail"
+   },
+   "UserPlaylistEntry": {
+    "properties": {
+     "track": {
+      "$ref": "#/components/schemas/Track"
+     },
+     "position": {
+      "type": "integer",
+      "title": "Position"
+     },
+     "added_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Added At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "track",
+     "position",
+     "added_at"
+    ],
+    "title": "UserPlaylistEntry"
+   },
+   "UserPlaylistSummary": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "name": {
+      "type": "string",
+      "title": "Name"
+     },
+     "description": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Description"
+     },
+     "is_public": {
+      "type": "boolean",
+      "title": "Is Public"
+     },
+     "track_count": {
+      "type": "integer",
+      "title": "Track Count"
+     },
+     "artwork": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Artwork",
+      "description": "Up to 4 artwork URLs for a mosaic cover",
+      "default": []
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Updated At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "name",
+     "description",
+     "is_public",
+     "track_count",
+     "created_at",
+     "updated_at"
+    ],
+    "title": "UserPlaylistSummary"
+   },
+   "ValidationError": {
+    "properties": {
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "type": "array",
+      "title": "Location"
+     },
+     "msg": {
+      "type": "string",
+      "title": "Message"
+     },
+     "type": {
+      "type": "string",
+      "title": "Error Type"
+     },
+     "input": {
+      "title": "Input"
+     },
+     "ctx": {
+      "type": "object",
+      "title": "Context"
+     }
+    },
+    "type": "object",
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError"
+   }
+  },
+  "securitySchemes": {
+   "HTTPBearer": {
+    "type": "http",
+    "scheme": "bearer"
+   }
+  }
+ }
+}
