@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../core/errors/app_exception.dart';
@@ -32,7 +33,18 @@ class ArtworkImage extends StatelessWidget {
     final dpr = MediaQuery.devicePixelRatioOf(context);
     final image = url == null || url!.isEmpty
         ? placeholder
-        : CachedNetworkImage(
+        : kIsWeb
+            // The provider's image CDN sends no CORS headers, which the web renderer
+            // needs to decode images itself; fall back to a plain <img> element there.
+            ? Image.network(
+                url!,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
+                errorBuilder: (_, _, _) => placeholder,
+              )
+            : CachedNetworkImage(
             imageUrl: url!,
             width: size,
             height: size,

@@ -538,4 +538,40 @@ void main() {
     expect(handler.mediaItem.value!.title, 'Song 1');
     expect(handler.playbackState.value.queueIndex, 1);
   });
+
+  group('tapping a song that cannot be played', () {
+    List<Track> mixed() => [
+          const Track(id: 'p0', title: 'Playable 0'),
+          const Track(id: 'x1', title: 'Blocked 1', playable: false),
+          const Track(id: 'p2', title: 'Playable 2'),
+          const Track(id: 'x3', title: 'Blocked 3', playable: false),
+        ];
+
+    test('starts the next playable song after it and says so', () async {
+      final errors = <String>[];
+      final sub = handler.errors.listen(errors.add);
+      await handler.playTracks(mixed(), startIndex: 1);
+      await settle();
+      expect(handler.currentTrack!.id, 'p2'); // not p0, the first playable song
+      expect(errors.single, contains('"Blocked 1" can\'t be played'));
+      await sub.cancel();
+    });
+
+    test('with no playable song after it, reports an error and plays nothing', () async {
+      final errors = <String>[];
+      final sub = handler.errors.listen(errors.add);
+      await handler.playTracks(mixed(), startIndex: 3);
+      await settle();
+      expect(handler.currentTrack, isNull);
+      expect(engine.loadedUrls, isEmpty);
+      expect(errors.single, contains('"Blocked 3" can\'t be played'));
+      await sub.cancel();
+    });
+
+    test('a playable tapped song still starts exactly there', () async {
+      await handler.playTracks(mixed(), startIndex: 2);
+      expect(handler.currentTrack!.id, 'p2');
+      expect(handler.playQueue.items.map((t) => t.id), ['p0', 'p2']);
+    });
+  });
 }

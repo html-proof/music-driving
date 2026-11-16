@@ -12,7 +12,12 @@ Errors use `{"detail": "..."}` with these status codes:
 | 404 | Not found (also: someone else's private playlist) |
 | 422 | Validation error |
 | 429 | Rate limited (`Retry-After` header) |
+| 502 | The music provider failed internally (`{"detail": "Music provider error"}`) |
 | 503 | Music provider unavailable (`Retry-After` header). Never reported as "no results". |
+
+**Music provider.** `MUSIC_PROVIDER=gaana` (with the GaanaPy service running) is required for the
+Indian film / label and international catalogue (e.g. "Tum Hi Ho", "Malare", "Taylor Swift"). The
+default, `audius`, only has music uploaded to Audius by its artists.
 
 ## Identifiers
 
@@ -35,6 +40,13 @@ Errors use `{"detail": "..."}` with these status codes:
 ```
 
 Tracks never contain stream URLs. Resolve them with `/playback/stream/{song_id}`.
+
+* `playable` means "may be streamed": it is `true` unless the provider reports the song as
+  unstreamable. Rows in search results and most lists are *lite* rows built from one provider
+  list request: no stream, `album: null`, artists without ids, and `duration: 0`.
+* `duration: 0` means **unknown**, not 0:00. The real length is known once the stream is loaded.
+* A song stored from a different provider (e.g. liked before `MUSIC_PROVIDER` changed) has
+  `playable: false`, and it is left out of recently played and recommendations.
 
 ## Health
 
@@ -73,8 +85,8 @@ A known `device_id` with the wrong secret gets `401`.
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/home?languages=English,Hindi` | Sections: recently played, made for you, trending, new releases, charts, trending artists, regional. Per-section provider failures are listed in `errors`; languages (Audius: genres) whose songs could not be loaded (provider busy, no earlier copy) are listed in `unavailable_languages`. Audius has no languages: Indian languages (`Hindi`, `Tamil`, `Telugu`, `Punjabi`, `Bengali`, `Marathi`, `Kannada`, `Malayalam`, `Gujarati`) give rows of the most played Audius songs that name the language; entries that name a genre (`Jazz`, `Pop`, ...) give per-genre rows; `English` (or nothing recognised) gives the all-genre trending row. |
-| GET | `/search?q=&limit=10&save=false` | `{songs, albums, artists, playlists, errors}`. `save=true` stores the query in search history (signed in). |
+| GET | `/home?languages=Malayalam,Hindi` | `HomeFeed` (below). `languages` overrides the user's preferences. |
+| GET | `/search?q=&type=all&page=1&limit=10&save=false` | `SearchResults` (below). `save=true` stores the query in search history (signed in). |
 | GET | `/songs/{seokey}` | Track |
 | GET | `/albums/{seokey}` | Album with tracks |
 | GET | `/albums/{album_id}/similar` | Numeric album id |
@@ -85,6 +97,67 @@ A known `device_id` with the wrong secret gets `401`.
 | GET | `/new-releases?language=` | `{language, tracks, albums}` |
 | GET | `/charts?limit=20` | Chart playlists |
 | GET | `/recommendations` 🔒 | Rule-based; `personalized: false` with an explanation when there is no listening data yet |
+
+### Search
+
+`q` is any text, in any script (1–200 characters; control characters are removed and whitespace
+collapsed). `type` is `all` (default), `songs`, `albums`, `artists` or `playlists`: with anything
+but `all`, only that section is searched and filled. `page` is 1–20, `limit` 1–30.
+
+```jsonc
+{ "query": "മലരേ", "type": "songs", "page": 1,
+  "alt_query": "malare",          // Latin form of an Indic-script query, also searched (else null)
+  "songs": [Track], "albums": [AlbumSummary], "artists": [ArtistSummary], "playlists": [PlaylistSummary],
+  "errors": {"albums": "Music provider is currently unavailable"},   // per section; never shown as "no results"
+  "has_more": {"songs": true} }   // another page may exist for that section
+```
+
+* Queries in Devanagari, Bengali, Gurmukhi, Gujarati, Oriya, Tamil, Telugu, Kannada or
+  Malayalam script are searched in both forms; the Latin results come first, without duplicates.
+* An empty section with no `errors` entry means the provider found nothing.
+* `errors.query` is set when the query is empty after cleaning.
+* Each section has its own deadline (`SEARCH_SECTION_TIMEOUT_SECONDS`, default 10 s).
+* Gaana has no playlist search: `playlists` matches chart titles.
+
+### Home
+
+```jsonc
+{ "greeting": "Good evening, Listener",
+  "languages": ["Malayalam", "Hindi", "Tamil", "Telugu", "Punjabi", "English"],
+  "sections": [HomeSection],
+  "errors": {"trending_tamil": "Music provider is currently unavailable"},
+  "unavailable_languages": ["Tamil"],      // rows that could not be loaded and had no earlier copy
+  "generated_at": "2026-11-16T14:03:11Z" }
+// HomeSection
+{ "id": "trending_malayalam", "title": "Trending in Malayalam", "subtitle": null,
+  "type": "tracks",               // tracks | albums | artists | playlists
+  "stale": false,                 // true: last good copy, served while the provider is unavailable
+  "tracks": [], "albums": [], "artists": [], "playlists": [] }
+```
+
+Section ids, in display order (rows with nothing to show are left out):
+
+| id | Row |
+|---|---|
+| `recently_played` | Signed in; the active provider's songs only |
+| `made_for_you` | Signed in, with listening data |
+| `trending_<language>` | "Trending in <Language>" for the user's languages first, then `HOME_LANGUAGES`, up to 6 rows. The first comes here; the others come after `charts` |
+| `new_tracks_<language>`, `new_albums_<language>` | New songs and albums (each up to the row size) for the first language |
+| `international_hits` | "International hits": trending in `INTERNATIONAL_LANGUAGE` (English) |
+| `new_tracks_english`, `new_albums_english` | New international songs and albums |
+| `top_artists` | "Popular artists": the artists named most often in the trending rows |
+| `popular_albums` | Albums of trending songs, only when the provider said which album a song is on |
+| `charts` | "Top charts" |
+
+Each provider row has its own deadline (`HOME_SECTION_TIMEOUT_SECONDS`, default 12 s). A row that
+fails or is late falls back to its last good copy (`stale: true`); if there is none, the row is
+left out and named in `errors` (and its language in `unavailable_languages`). Home itself does not
+fail because of one row.
+
+Audius has no languages: Indian language names (`Hindi`, `Tamil`, `Telugu`, `Punjabi`, `Bengali`,
+`Marathi`, `Kannada`, `Malayalam`, `Gujarati`) give rows of the most played Audius songs that name
+the language, genre names (`Jazz`, `Pop`, ...) give genre rows, and `international_hits` is the
+all-genre trending list. Its new releases are global (`new_*_english` only).
 
 ## Library 🔒
 
@@ -98,6 +171,7 @@ A known `device_id` with the wrong secret gets `401`.
 | GET | `/library/recently-played?limit=` | Distinct tracks, newest first |
 | GET / DELETE | `/library/history?offset=&limit=` | Full listening history |
 | GET / DELETE | `/library/search-history[?entry_id=]` | |
+| POST | `/library/search-history` | `{query}` → 204. Records a search without running it (e.g. when a result is tapped) |
 
 ## User playlists 🔒
 

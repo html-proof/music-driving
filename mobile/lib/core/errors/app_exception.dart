@@ -18,10 +18,12 @@ class AppException implements Exception {
       if (inner is AppException) return inner;
       switch (error.type) {
         case DioExceptionType.connectionTimeout:
-        case DioExceptionType.sendTimeout:
-        case DioExceptionType.receiveTimeout:
         case DioExceptionType.connectionError:
           return const AppException('Can\'t reach the server. Check your connection.', isNetwork: true);
+        case DioExceptionType.sendTimeout:
+        case DioExceptionType.receiveTimeout:
+          // The server was reached but answered too slowly; not the user's connection.
+          return const AppException('The music service is slow right now. Try again in a moment.', isNetwork: true);
         case DioExceptionType.cancel:
           return const AppException('Request cancelled');
         default:

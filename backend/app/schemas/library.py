@@ -44,6 +44,10 @@ class HistoryPage(BaseModel):
     has_more: bool
 
 
+class SearchHistoryCreate(BaseModel):
+    query: str = Field(min_length=1, max_length=200)
+
+
 class PlaylistCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=2000)

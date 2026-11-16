@@ -36,6 +36,9 @@ class FakeBackend implements HttpClientAdapter {
       case '/lyrics/provider-down':
         // What our backend returns while Gaana is blocking us.
         return _json(503, {'detail': 'Music provider is currently unavailable'});
+      case '/slow':
+        // The server was reached but didn't answer in time.
+        throw DioException(requestOptions: o, type: DioExceptionType.receiveTimeout);
       case '/gateway-hiccup':
         // A proxy/gateway error (no JSON body): genuinely transient.
         return ResponseBody.fromString('Bad Gateway', 502, headers: {Headers.contentTypeHeader: ['text/plain']});
@@ -114,5 +117,12 @@ void main() {
     backend.calls.clear();
     await expectLater(api.get<dynamic>('/gateway-hiccup'), throwsA(anything));
     expect(backend.calls.where((c) => c == 'GET /gateway-hiccup'), hasLength(3));
+  });
+
+  test('a receive timeout is not retried (the server is slow, not unreachable)', () async {
+    await api.ensureSession();
+    backend.calls.clear();
+    await expectLater(api.get<dynamic>('/slow'), throwsA(anything));
+    expect(backend.calls.where((c) => c == 'GET /slow'), hasLength(1));
   });
 }

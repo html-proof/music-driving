@@ -20,9 +20,29 @@ python -m venv .venv && .venv/Scripts/pip install -r requirements.txt   # Linux/
 .venv/Scripts/python -m uvicorn app:app --port 8001
 ```
 This copy includes fixes that aren't upstream yet ([`third_party/patches/gaanapy-local-fixes.patch`](third_party/patches/gaanapy-local-fixes.patch),
-[`third_party/patches/gaanapy-request-cap.patch`](third_party/patches/gaanapy-request-cap.patch)).
-The request cap keeps at most `GAANA_MAX_CONCURRENT` (default 4) requests to Gaana in flight, because
-bursts are what get the server rate-limited or blocked.
+[`third_party/patches/gaanapy-request-cap.patch`](third_party/patches/gaanapy-request-cap.patch),
+[`third_party/patches/gaanapy-song-cache.patch`](third_party/patches/gaanapy-song-cache.patch),
+[`third_party/patches/gaanapy-lite-lists.patch`](third_party/patches/gaanapy-lite-lists.patch)).
+Bursts of requests are what get the server rate-limited or blocked, so:
+
+* Search, trending, new releases, playlists, album and artist tracks build their rows from the one
+  list response Gaana already sends (`"lite": true` rows, stream links resolved at play time through
+  `/songs/info/`). A details request is only made for entries that lack a title or artwork.
+* Search accepts any language or script, plus `page` (1 to 20), and sends the keyword URL-encoded.
+* Every request is paced and cached. Requests are not disguised as a browser; when Gaana refuses
+  (401/403/429), GaanaPy stops calling it for the cooldown below instead of retrying:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `GAANA_MAX_CONCURRENT` | 4 | Requests to Gaana in flight at once |
+| `GAANA_MIN_INTERVAL_MS` | 200 | Minimum time between two request starts |
+| `GAANA_BLOCK_COOLDOWN_SECONDS` | 120 | After a 401/403/429, no request is sent for this long; doubles on every repeated block, up to 900 s |
+| `GAANA_LIST_CACHE_SECONDS` | 600 | How long list and search responses are reused (0 turns it off) |
+| `GAANA_SONG_CACHE_SECONDS` | 1800 | How long song details are reused (never past their stream links' expiry) |
+
+Errors: a block (or the cooldown after one) is `503 {"error":"blocked","upstream_status":403,"retry_after":120}`,
+a network error, timeout or 5xx from Gaana is `502 {"error":"upstream_unavailable","detail":...}`, a bug in
+GaanaPy is `500 {"error":"internal","detail":...}`, and an empty result stays `404`.
 The upstream commit is in `third_party/GAANAPY_UPSTREAM_COMMIT`.
 
 ### Backend
@@ -34,6 +54,9 @@ cp .env.example .env            # set DATABASE_URL, JWT_SECRET, GAANAPY_BASE_URL
 .venv/Scripts/python -m alembic upgrade head
 .venv/Scripts/python run_dev.py # http://localhost:8000/docs
 ```
+`.env.example` sets `MUSIC_PROVIDER=gaana`, which needs the GaanaPy service above and is required for
+the Indian film / label and international catalogue. Without it the backend uses its default, `audius`,
+which only has music uploaded to Audius by its artists.
 `run_dev.py` exists because, on Windows, the async PostgreSQL driver (psycopg) needs a selector event
 loop. On Linux/macOS, `uvicorn app.main:app --reload` works too. Without `REDIS_URL`, the backend uses
 an in-process cache, which is fine for a single dev process.
@@ -116,7 +139,10 @@ See `backend/.env.example` (all backend settings) and `.env.example` (compose). 
 | `DATABASE_URL` | `postgresql+psycopg://user:pass@host:5432/db` |
 | `REDIS_URL` | Shared cache and rate limits. Required with more than one worker or instance. |
 | `JWT_SECRET` | Signs access tokens. Long and random; rotating it signs everyone out. |
-| `MUSIC_PROVIDER` | `audius` (default, public Audius API) or `gaana` (also start compose with `--profile gaana`) |
+| `MUSIC_PROVIDER` | `audius` (default, public Audius API) or `gaana` (also start compose with `--profile gaana`). **`gaana` is required for the Indian film / label and international catalogue**; Audius only has music its artists uploaded there |
+| `HOME_LANGUAGES` | "Trending in" rows after the user's own languages (default `Hindi,Malayalam,Tamil,Telugu,Punjabi`; 6 rows at most) |
+| `INTERNATIONAL_LANGUAGE` | Language of the "International hits" row (default `English`) |
+| `HOME_SECTION_TIMEOUT_SECONDS` / `SEARCH_SECTION_TIMEOUT_SECONDS` | Deadline per Home row (12) / search section (10); late rows fall back to their last good copy |
 | `AUDIUS_APP_NAME` | Name sent to Audius as `app_name` (default `Melodia`) |
 | `GAANAPY_BASE_URL` | URL of the GaanaPy service (Gaana only) |
 | `VERIFY_STREAM_QUALITY` | Check that each HLS quality exists before returning it (Gaana only) |

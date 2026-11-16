@@ -45,8 +45,11 @@ def _apply_track(song: Song, t: Track) -> None:
     song.release_date = t.release_date
 
 
-def song_to_track(song: Song) -> Track:
-    """Render a stored song (metadata only; playability is checked at stream time)."""
+def song_to_track(song: Song, provider: str | None = None) -> Track:
+    """Render a stored song (metadata only; the stream is resolved at play time).
+
+    `provider` is the active provider's name: a song stored from another provider (e.g.
+    liked before MUSIC_PROVIDER changed) cannot be streamed now, so it is not playable."""
     names = [n.strip() for n in song.artists.split(",")] if song.artists else []
     keys = [k.strip() for k in song.artist_seokeys.split(",")] if song.artist_seokeys else []
     ids = [i.strip() for i in song.artist_ids.split(",")] if song.artist_ids else []
@@ -71,7 +74,7 @@ def song_to_track(song: Song) -> Track:
         is_explicit=song.is_explicit,
         release_date=song.release_date,
         artwork=Artwork(small=song.image_small, medium=song.image_medium, large=song.image_large),
-        playable=True,
+        playable=provider is None or song.provider == provider,
     )
 
 

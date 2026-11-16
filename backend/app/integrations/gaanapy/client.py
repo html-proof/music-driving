@@ -12,21 +12,38 @@ from typing import Any
 
 import httpx
 
-from app.integrations.errors import ProviderNotFound, ProviderUnavailable
+from app.integrations.errors import ProviderError, ProviderInvalidRequest, ProviderNotFound, ProviderUnavailable
 
 log = logging.getLogger(__name__)
+
+# Longest wait GaanaPy's `retry_after` can impose on us (guards against a garbage value).
+_MAX_RETRY_AFTER_SECONDS = 3600
 
 
 class GaanaPyClient:
     """Every request to Gaana goes through here, so this is where load is controlled:
 
     * Identical requests already in flight share one call (single-flight).
-    * Retries only cover GaanaPy itself being unreachable (local network hiccup).
-    * When Gaana refuses a request (GaanaPy answers 5xx: blocked / rate-limited), the
-      client stops calling for a cooldown that doubles on each repeat block, up to a
-      maximum. During the cooldown every call fails fast with ProviderUnavailable and
-      nothing reaches Gaana. After it, a single probe request decides: success ends
-      the cooldown, another refusal starts a longer one.
+    * Retries only cover GaanaPy itself being unreachable (connection refused / connect
+      timeout). A read timeout is never retried: GaanaPy already has the request and is
+      working on it, so a retry would only send the same Gaana traffic again.
+    * GaanaPy's answers map to errors as follows:
+        503 {"error": "blocked", "retry_after": n}  Gaana refused us (401/403/429) or
+            GaanaPy's own circuit breaker is open -> ProviderUnavailable and a cooldown
+            (at least `retry_after`) that doubles on each repeat block, up to a maximum.
+            During the cooldown every call fails fast and nothing reaches Gaana. After
+            it, a single probe request decides: success ends the cooldown, another
+            refusal starts a longer one. Answers to requests that were already in flight
+            when the cooldown started or ended belong to the earlier period: a refusal
+            only extends the current cooldown to its `retry_after` (it never doubles it,
+            so one burst of parallel 503s counts as one block) and a success does not end
+            it.
+        502 / 504  network error or 5xx from Gaana -> ProviderUnavailable for this call
+            only (no cooldown: Gaana did not refuse us).
+        500  a bug inside GaanaPy -> ProviderError (logged, no cooldown).
+        404  nothing found -> ProviderNotFound.
+        400 / 422  GaanaPy rejected the parameters -> ProviderInvalidRequest (never
+            remembered as "not found").
     """
 
     def __init__(self, base_url: str, timeout: float = 30.0, retries: int = 2,
@@ -46,6 +63,9 @@ class GaanaPyClient:
         self._blocked_until = 0.0
         self._cooldown = 0.0
         self._probing = False
+        # Bumped whenever a cooldown starts or ends; each request remembers the value it
+        # was sent under, so late answers from an earlier period are recognised.
+        self._period = 0
         self._in_flight: dict[tuple, asyncio.Future] = {}
 
     async def close(self) -> None:
@@ -65,6 +85,12 @@ class GaanaPyClient:
         self._in_flight[key] = future
         try:
             result = await self._get_uncoalesced(path, params)
+        except asyncio.CancelledError:
+            # This caller gave up (e.g. a section deadline); others sharing the call did
+            # not, so they get a provider error instead of a foreign cancellation.
+            future.set_exception(ProviderUnavailable("Music provider request was cancelled"))
+            future.exception()
+            raise
         except BaseException as exc:
             future.set_exception(exc)
             future.exception()  # mark retrieved: nobody else may be waiting
@@ -84,48 +110,73 @@ class GaanaPyClient:
         probe = bool(self._cooldown)
         self._probing = probe
         try:
-            return await self._request(path, params)
+            return await self._request(path, params, self._period)
         finally:
             if probe:
                 self._probing = False
 
-    async def _request(self, path: str, params: dict[str, Any] | None) -> Any:
+    async def _request(self, path: str, params: dict[str, Any] | None, period: int) -> Any:
         last_exc: Exception | None = None
         for attempt in range(self._retries + 1):
             try:
                 resp = await self._client.get(path, params=params)
-            except (httpx.TransportError, httpx.TimeoutException) as exc:
+            except (httpx.ConnectError, httpx.ConnectTimeout) as exc:
                 # GaanaPy itself is unreachable: no Gaana traffic was sent, so retry.
                 last_exc = exc
                 log.warning("GaanaPy %s failed (attempt %d): %s", path, attempt + 1, exc)
                 if attempt < self._retries:
                     await asyncio.sleep(0.4 * (2**attempt))
                 continue
-            if resp.status_code >= 500:
-                # Gaana refused (GaanaPy reports blocks / rate limits as 502). Retrying
-                # would only extend the block: back off instead.
-                self._start_cooldown()
-                log.warning("GaanaPy %s -> %s; not calling Gaana for %.0f s", path, resp.status_code,
-                            self._cooldown)
-                raise ProviderUnavailable(f"GaanaPy returned {resp.status_code}: {_detail(resp)}")
-            self._end_cooldown()
-            if resp.status_code == 404:
-                raise ProviderNotFound(_detail(resp))
-            if resp.status_code in (400, 422):
-                # GaanaPy validates seokeys/queries strictly; treat as "nothing found".
-                raise ProviderNotFound(_detail(resp))
-            resp.raise_for_status()
-            return resp.json()
+            except (httpx.TransportError, httpx.TimeoutException) as exc:
+                # GaanaPy got the request (read timeout, dropped connection) and may still
+                # be calling Gaana for it: a retry would send that traffic again.
+                log.warning("GaanaPy %s failed: %r", path, exc)
+                raise ProviderUnavailable(f"Music provider did not answer: {type(exc).__name__}") from exc
+            return self._handle(path, resp, period)
         raise ProviderUnavailable(f"Music provider unreachable: {last_exc}")
 
-    def _start_cooldown(self) -> None:
-        self._cooldown = min(self._cooldown * 2, self._cooldown_max) if self._cooldown else self._cooldown_base
-        self._blocked_until = self._clock() + self._cooldown
+    def _handle(self, path: str, resp: httpx.Response, period: int) -> Any:
+        status = resp.status_code
+        if status in (503, 429):
+            # Gaana refused us, or GaanaPy's own breaker is open. Retrying would only
+            # extend the block: back off, for at least as long as GaanaPy asks.
+            self._start_cooldown(_retry_after(resp), period)
+            log.warning("GaanaPy %s -> %s (%s); not calling Gaana for %.0f s", path, status, _detail(resp),
+                        self._blocked_until - self._clock())
+            raise ProviderUnavailable(f"Music provider is blocking requests ({_detail(resp)})")
+        if status == 500:
+            log.error("GaanaPy %s -> 500 (internal error: %s)", path, _detail(resp))
+            raise ProviderError("Music provider error")
+        if status >= 500:
+            # Gaana failed or timed out on its side: this call fails, nothing else does.
+            log.warning("GaanaPy %s -> %s: %s", path, status, _detail(resp))
+            raise ProviderUnavailable(f"GaanaPy returned {status}: {_detail(resp)}")
+        self._end_cooldown(period)
+        if status == 404:
+            raise ProviderNotFound(_detail(resp))
+        if status in (400, 422):
+            raise ProviderInvalidRequest(_detail(resp))
+        resp.raise_for_status()
+        return resp.json()
 
-    def _end_cooldown(self) -> None:
-        if self._cooldown:
-            log.info("Music provider answering again; cooldown over")
+    def _start_cooldown(self, retry_after: float, period: int) -> None:
+        now = self._clock()
+        if period != self._period:
+            # Sent before the current cooldown started (a parallel request of the same
+            # burst) or before a probe ended the last one: not a new block.
+            if self._cooldown:
+                self._blocked_until = max(self._blocked_until, now + retry_after)
+            return
+        self._cooldown = min(self._cooldown * 2, self._cooldown_max) if self._cooldown else self._cooldown_base
+        self._period += 1
+        self._blocked_until = max(self._blocked_until, now + max(self._cooldown, retry_after))
+
+    def _end_cooldown(self, period: int) -> None:
+        if not self._cooldown or period != self._period:
+            return  # no cooldown, or a late answer to a request sent before it started
+        log.info("Music provider answering again; cooldown over")
         self._cooldown = 0.0
+        self._period += 1
         self._blocked_until = 0.0
 
     async def health(self) -> bool:
@@ -136,14 +187,15 @@ class GaanaPyClient:
             return False
 
     # --- endpoints -------------------------------------------------------
-    async def search_songs(self, query: str, limit: int) -> list[dict]:
-        return await self._get("/songs/search/", {"query": query, "limit": limit})
+    # Search pages are 1-based slices of Gaana's first result page (GaanaPy caps page at 20).
+    async def search_songs(self, query: str, limit: int, page: int = 1) -> list[dict]:
+        return await self._get("/songs/search/", {"query": query, "limit": limit, "page": page})
 
-    async def search_albums(self, query: str, limit: int) -> list[dict]:
-        return await self._get("/albums/search/", {"query": query, "limit": limit})
+    async def search_albums(self, query: str, limit: int, page: int = 1) -> list[dict]:
+        return await self._get("/albums/search/", {"query": query, "limit": limit, "page": page})
 
-    async def search_artists(self, query: str, limit: int) -> list[dict]:
-        return await self._get("/artists/search/", {"query": query, "limit": limit})
+    async def search_artists(self, query: str, limit: int, page: int = 1) -> list[dict]:
+        return await self._get("/artists/search/", {"query": query, "limit": limit, "page": page})
 
     async def song_info(self, seokey: str) -> list[dict]:
         return await self._get("/songs/info/", {"seokey": seokey})
@@ -179,6 +231,26 @@ class GaanaPyClient:
 def _detail(resp: httpx.Response) -> str:
     try:
         body = resp.json()
-        return str(body.get("detail") or body.get("error") or body)
     except ValueError:
         return resp.text[:200]
+    if not isinstance(body, dict):
+        return str(body)[:200]
+    parts = [str(body[k]) for k in ("error", "detail", "upstream_status") if body.get(k) not in (None, "")]
+    return ": ".join(parts) if parts else str(body)[:200]
+
+
+def _retry_after(resp: httpx.Response) -> float:
+    """Seconds GaanaPy asks us to wait (JSON `retry_after`, else the Retry-After header)."""
+    value: Any = None
+    try:
+        body = resp.json()
+        if isinstance(body, dict):
+            value = body.get("retry_after")
+    except ValueError:
+        pass
+    if value is None:
+        value = resp.headers.get("Retry-After")
+    try:
+        return min(max(float(value), 0.0), _MAX_RETRY_AFTER_SECONDS)
+    except (TypeError, ValueError):
+        return 0.0

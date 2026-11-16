@@ -1,6 +1,7 @@
 import asyncio
 
 
+
 class Discovery:
     """Methods for Gaana's newer discovery endpoints."""
 
@@ -36,16 +37,11 @@ class Discovery:
         records = self._track_records(result)
         if not records:
             return await self.errors.no_results()
-        records = [self._format_artist_track_record(record) for record in records]
-        seokeys = [record.get("seokey") for record in records if isinstance(record, dict)]
-        if seokeys and hasattr(self, "get_track_info"):
-            tracks = await self.get_track_info(seokeys[:limit])
-        else:
-            tracks = await asyncio.gather(*[
-                self.format_json_songs(record) for record in records[:limit]
-            ])
-        if isinstance(tracks, dict) and "error" in tracks:
-            return tracks
+        # The records already carry title, artwork, artists, album and the stream link:
+        # build the rows from them; songDetail only for records that lack those.
+        tracks = await self.songs_from_entities(records, limit)
+        if not tracks:
+            return await self.errors.no_results()
         return {"tracks": tracks, "total": result.get("total", len(records))}
 
     async def format_discovered_album(self, record: dict) -> dict:
@@ -90,35 +86,6 @@ class Discovery:
         if not isinstance(result, dict):
             return []
         return result.get("tracks") or result.get("entities") or result.get("data") or []
-
-    @staticmethod
-    def _format_artist_track_record(record: dict) -> dict:
-        values = {
-            item.get("key"): item.get("value")
-            for item in record.get("entity_info", [])
-            if isinstance(item, dict) and item.get("key")
-        }
-        stream = values.get("stream_url") or {}
-        medium = stream.get("medium") if isinstance(stream, dict) else {}
-        album = values.get("album") or [{}]
-        album = album[0] if isinstance(album, list) and album else {}
-        return {
-            "seokey": record.get("seokey", ""),
-            "track_id": record.get("entity_id", ""),
-            "track_title": record.get("name", ""),
-            "artist": values.get("artist") or [],
-            "albumseokey": album.get("album_seokey", ""),
-            "album_title": album.get("name", ""),
-            "album_id": album.get("album_id", ""),
-            "language": record.get("language", ""),
-            "artwork_large": record.get("artwork_medium", ""),
-            "artwork_web": record.get("atw", ""),
-            "artwork": record.get("artwork", ""),
-            "duration": values.get("duration", ""),
-            "parental_warning": values.get("parental_warning", 0),
-            "play_ct": values.get("play_ct", ""),
-            "urls": {"medium": medium} if isinstance(medium, dict) else {},
-        }
 
     @staticmethod
     def _is_seokey_only(record: dict) -> bool:

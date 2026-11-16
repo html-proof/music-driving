@@ -14,6 +14,7 @@ from app.schemas.library import (
     PlaylistCreate,
     PlaylistReorder,
     PlaylistUpdate,
+    SearchHistoryCreate,
     UserPlaylistDetail,
     UserPlaylistSummary,
 )
@@ -94,6 +95,12 @@ async def clear_history(user: CurrentUser, db: DB, catalog: Catalog) -> None:
 async def search_history(user: CurrentUser, db: DB, catalog: Catalog,
                          limit: Annotated[int, Query(ge=1, le=50)] = 20) -> list[dict]:
     return await LibraryService(db, catalog, user.id).search_history(limit)
+
+
+@router.post("/library/search-history", status_code=status.HTTP_204_NO_CONTENT,
+             summary="Record a search (e.g. when a result is tapped) without running it again")
+async def record_search(body: SearchHistoryCreate, user: CurrentUser, db: DB, catalog: Catalog) -> None:
+    await LibraryService(db, catalog, user.id).record_search(body.query)
 
 
 @router.delete("/library/search-history", status_code=status.HTTP_204_NO_CONTENT)

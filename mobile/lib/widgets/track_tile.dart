@@ -12,7 +12,16 @@ import 'common.dart';
 
 /// A song row. [onTap] normally starts playback of the surrounding list at this song.
 class TrackTile extends ConsumerWidget {
-  const TrackTile({super.key, required this.track, required this.onTap, this.index, this.showArtwork = true, this.trailing});
+  const TrackTile({
+    super.key,
+    required this.track,
+    required this.onTap,
+    this.index,
+    this.showArtwork = true,
+    this.trailing,
+    this.typeLabel,
+    this.showDuration = false,
+  });
 
   final Track track;
   final VoidCallback onTap;
@@ -20,10 +29,22 @@ class TrackTile extends ConsumerWidget {
   final bool showArtwork;
   final Widget? trailing;
 
+  /// Shown before the artists, e.g. "Song" in mixed search results.
+  final String? typeLabel;
+
+  /// Append the length when it is known (0 means unknown and shows nothing, not 0:00).
+  final bool showDuration;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isCurrent = ref.watch(currentTrackProvider.select((t) => t?.id == track.id));
     final enabled = track.playable;
+    final details = [
+      ?typeLabel,
+      if (track.artistNames.isNotEmpty) track.artistNames,
+      if (showDuration && track.hasDuration) formatDuration(track.durationValue),
+      if (!enabled) 'unavailable',
+    ].join(' · ');
     return ListTile(
       enabled: enabled,
       contentPadding: const EdgeInsets.only(left: 16, right: 4),
@@ -49,7 +70,7 @@ class TrackTile extends ConsumerWidget {
           ),
         Expanded(
           child: Text(
-            enabled ? track.artistNames : '${track.artistNames} · unavailable',
+            details,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(color: AppColors.textSecondary),

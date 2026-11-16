@@ -122,7 +122,7 @@ class PlaybackService:
         for sid in session.queue:
             song = await catalog_repo.get_song(self.db, self.catalog.provider.name, sid)
             if song is not None:
-                local[sid] = catalog_repo.song_to_track(song)
+                local[sid] = catalog_repo.song_to_track(song, self.catalog.provider.name)
             else:
                 missing.append(sid)
         fetched = await asyncio.gather(*[self.catalog.song(s) for s in missing], return_exceptions=True)

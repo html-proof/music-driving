@@ -1,55 +1,73 @@
 import asyncio
 
+from api.entities import artist_row_from_entity, page_slice, search_items
+from api.errors import UpstreamError, most_severe
+
+
 class Artists:
-    async def search_artists(self, search_query: str, limit: int) -> list:
+    async def search_artists(self, search_query: str, limit: int, page: int = 1) -> list:
+        """Rows built straight from the search hits: one Gaana request, no detail lookups."""
         endpoints = self.api_endpoints
         errors = self.errors
-        result = await self._safe_request("POST", endpoints.search_artists_url + search_query)
+        result = await self._safe_request(
+            "POST", endpoints.search_url, params=endpoints.search_params("artist", search_query)
+        )
         if isinstance(result, dict) and "error" in result:
             return result
-        artist_ids = []
-        gd = (result.get('gr') or [{}])[0].get('gd', [])
-        for i in range(min(limit, len(gd))):
-            seo = gd[i].get('seo') if isinstance(gd[i], dict) else None
-            if seo:
-                artist_ids.append(seo)
-        if len(artist_ids) == 0:
+        rows = []
+        seen = set()
+        for item in search_items(result):
+            row = artist_row_from_entity(item)
+            if row is not None and row["seokey"] not in seen:
+                seen.add(row["seokey"])
+                rows.append(row)
+        rows = page_slice(rows, limit, page)
+        if len(rows) == 0:
             return await errors.no_results()
-        artist_info = await self.get_artist_info(artist_ids, False)
-        return artist_info
+        return rows
 
     async def get_artist_info(self, artist_id: list, info: bool, limit: int = 10, page: int = 1) -> list:
+        """One artistDetail request per artist. A failed artist is dropped; when all of
+        them failed, the most severe failure (a block first) is raised."""
         endpoints = self.api_endpoints
         errors = self.errors
         results = await asyncio.gather(*[
             self._safe_request("POST", endpoints.artist_details_url + i)
             for i in artist_id
-        ])
+        ], return_exceptions=True)
         artist_info = []
+        failures = []
         for result in results:
+            if isinstance(result, BaseException):
+                # Only provider failures are tolerated; a bug must surface as one.
+                if not isinstance(result, UpstreamError):
+                    raise result
+                failures.append(result)
+                continue
             if isinstance(result, dict) and "error" in result:
                 continue
-            artist_info.append(await self.format_json_artists(result, limit, page, info=info))
+            artist = await self.format_json_artists(result, limit, page, info=info)
+            if "error" not in artist:
+                artist_info.append(artist)
         if len(artist_info) == 0:
+            if failures:
+                raise most_severe(failures)
             return await errors.no_results()
         return artist_info
 
     async def get_top_tracks(self, artist_id: str, limit: int = 10, page: int = 1) -> dict:
+        """The artist's tracks, one page of them, built from the track-list payload
+        (songDetail only for entries that lack title or artwork)."""
         endpoints = self.api_endpoints
-        result = await self._safe_request("POST", endpoints.artist_top_tracks + artist_id)
+        result = await self._safe_request("POST", endpoints.artist_top_tracks + str(artist_id))
         if isinstance(result, dict) and "error" in result:
-            return result
-        track_seokeys = []
-        for track in result.get('entities', []):
-            seo = track.get('seokey') if isinstance(track, dict) else None
-            if seo:
-                track_seokeys.append(seo)
-        total = len(track_seokeys)
-        offset = (page - 1) * limit
-        paginated_seokeys = track_seokeys[offset:offset + limit]
-        tracks = await self.get_track_info(paginated_seokeys)
-        if isinstance(tracks, dict) and "error" in tracks:
-            return {"tracks": [], "total": total}
+            return {"tracks": [], "total": 0}
+        entities = [
+            entity for entity in result.get('entities') or []
+            if isinstance(entity, dict) and entity.get('seokey')
+        ]
+        total = len(entities)
+        tracks = await self.songs_from_entities(page_slice(entities, limit, page), limit)
         return {"tracks": tracks, "total": total}
 
     async def get_similar_artists(self, artist_id: str, limit: int) -> dict:

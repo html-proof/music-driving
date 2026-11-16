@@ -154,6 +154,7 @@ class HomeSection {
     this.albums = const [],
     this.artists = const [],
     this.playlists = const [],
+    this.stale = false,
   });
 
   final String id;
@@ -165,6 +166,18 @@ class HomeSection {
   final List<ArtistSummary> artists;
   final List<PlaylistSummary> playlists;
 
+  /// Served from the backend's last good copy because the provider is unavailable.
+  final bool stale;
+
+  /// Number of items of this section's [type].
+  int get itemCount => switch (type) {
+        'tracks' => tracks.length,
+        'albums' => albums.length,
+        'artists' => artists.length,
+        'playlists' => playlists.length,
+        _ => 0,
+      };
+
   factory HomeSection.fromJson(Map<String, dynamic> j) => HomeSection(
         id: j['id'] as String,
         title: j['title'] as String,
@@ -175,6 +188,7 @@ class HomeSection {
         artists: (j['artists'] as List? ?? []).map((e) => ArtistSummary.fromJson(e as Map<String, dynamic>)).toList(),
         playlists:
             (j['playlists'] as List? ?? []).map((e) => PlaylistSummary.fromJson(e as Map<String, dynamic>)).toList(),
+        stale: j['stale'] as bool? ?? false,
       );
 }
 
@@ -185,8 +199,10 @@ class HomeFeed {
     this.errors = const {},
     this.unavailableLanguages = const [],
     this.fromCache = false,
+    this.generatedAt,
   });
 
+  /// Empty when the backend sent none (the UI then greets by local time of day).
   final String greeting;
   final List<HomeSection> sections;
   final Map<String, String> errors;
@@ -194,40 +210,111 @@ class HomeFeed {
   /// Languages whose songs the music provider couldn't return right now.
   final List<String> unavailableLanguages;
   final bool fromCache;
+  final DateTime? generatedAt;
 
   factory HomeFeed.fromJson(Map<String, dynamic> j, {bool fromCache = false}) => HomeFeed(
-        greeting: j['greeting'] as String,
-        sections: (j['sections'] as List).map((e) => HomeSection.fromJson(e as Map<String, dynamic>)).toList(),
-        errors: (j['errors'] as Map? ?? {}).cast<String, String>(),
+        greeting: j['greeting'] as String? ?? '',
+        sections: (j['sections'] as List? ?? const [])
+            .map((e) => HomeSection.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        errors: _stringMap(j['errors']),
         unavailableLanguages: (j['unavailable_languages'] as List? ?? const []).cast<String>(),
         fromCache: fromCache,
+        generatedAt: j['generated_at'] is String ? DateTime.tryParse(j['generated_at'] as String) : null,
       );
 }
 
+/// `{section: message}`; non-string messages are stringified rather than dropped.
+Map<String, String> _stringMap(dynamic m) =>
+    m is Map ? {for (final e in m.entries) e.key.toString(): e.value?.toString() ?? ''} : const {};
+
+/// Search sections, in the backend's `type` vocabulary.
+const searchSections = ['songs', 'artists', 'albums', 'playlists'];
+
 class SearchResults {
   const SearchResults({
+    this.query = '',
+    this.type = 'all',
+    this.page = 1,
+    this.altQuery,
     this.songs = const [],
     this.albums = const [],
     this.artists = const [],
     this.playlists = const [],
     this.errors = const {},
+    this.hasMore = const {},
   });
 
+  final String query;
+
+  /// `all` or one of [searchSections]; only that section is filled for a single type.
+  final String type;
+  final int page;
+
+  /// Latin transliteration that was also searched for an Indic-script query.
+  final String? altQuery;
   final List<Track> songs;
   final List<AlbumSummary> albums;
   final List<ArtistSummary> artists;
   final List<PlaylistSummary> playlists;
+
+  /// `{section: message}` for sections the provider couldn't answer (`query` when the
+  /// query was empty after cleaning).
   final Map<String, String> errors;
+  final Map<String, bool> hasMore;
 
   bool get isEmpty => songs.isEmpty && albums.isEmpty && artists.isEmpty && playlists.isEmpty;
 
+  /// Number of rows in [section].
+  int countOf(String section) => switch (section) {
+        'songs' => songs.length,
+        'albums' => albums.length,
+        'artists' => artists.length,
+        'playlists' => playlists.length,
+        _ => 0,
+      };
+
+  bool hasMoreFor(String section) => hasMore[section] ?? false;
+
+  /// This page followed by [next]'s rows (rows already present, by id, are not repeated).
+  SearchResults append(SearchResults next) {
+    List<T> merge<T>(List<T> a, List<T> b, String Function(T) id) {
+      final seen = {for (final x in a) id(x)};
+      return [...a, ...b.where((x) => seen.add(id(x)))];
+    }
+
+    return SearchResults(
+      query: query,
+      type: type,
+      page: next.page,
+      altQuery: altQuery ?? next.altQuery,
+      songs: merge(songs, next.songs, (t) => t.id),
+      albums: merge(albums, next.albums, (a) => a.id),
+      artists: merge(artists, next.artists, (a) => a.id),
+      playlists: merge(playlists, next.playlists, (p) => p.id),
+      errors: next.errors,
+      hasMore: next.hasMore,
+    );
+  }
+
   factory SearchResults.fromJson(Map<String, dynamic> j) => SearchResults(
+        query: j['query'] as String? ?? '',
+        type: j['type'] as String? ?? 'all',
+        page: (j['page'] as num?)?.toInt() ?? 1,
+        altQuery: switch (j['alt_query']) {
+          final String alt when alt.trim().isNotEmpty => alt,
+          _ => null,
+        },
         songs: tracksFrom(j['songs']),
         albums: (j['albums'] as List? ?? []).map((e) => AlbumSummary.fromJson(e as Map<String, dynamic>)).toList(),
         artists: (j['artists'] as List? ?? []).map((e) => ArtistSummary.fromJson(e as Map<String, dynamic>)).toList(),
         playlists:
             (j['playlists'] as List? ?? []).map((e) => PlaylistSummary.fromJson(e as Map<String, dynamic>)).toList(),
-        errors: (j['errors'] as Map? ?? {}).cast<String, String>(),
+        errors: _stringMap(j['errors']),
+        hasMore: {
+          if (j['has_more'] is Map)
+            for (final e in (j['has_more'] as Map).entries) e.key.toString(): e.value == true,
+        },
       );
 }
 

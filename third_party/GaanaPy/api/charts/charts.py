@@ -1,5 +1,7 @@
 import asyncio
 
+from api.entities import artwork_urls
+
 class Charts:
     async def get_charts(self, limit: int) -> list:
         endpoints = self.api_endpoints
@@ -31,9 +33,10 @@ class Charts:
         )
         data['play_count'] = entity_info[-1].get('value', '') if entity_info else ''
         data['playlist_url'] = f"https://gaana.com/playlist/{data['seokey']}" if data['seokey'] else ''
-        atw = results.get('atw', '')
+        atw = results.get('atw') or ''
+        sizes = artwork_urls(atw)
         data['images'] = {'urls': {}}
-        data['images']['urls']['large_artwork'] = atw.replace("size_m.jpg", "size_l.jpg") if atw else ''
+        data['images']['urls']['large_artwork'] = sizes['large_artwork']
         data['images']['urls']['medium_artwork'] = atw
-        data['images']['urls']['small_artwork'] = atw.replace("size_m.jpg", "size_s.jpg") if atw else ''
+        data['images']['urls']['small_artwork'] = sizes['small_artwork']
         return data

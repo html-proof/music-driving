@@ -152,13 +152,15 @@ async def test_format_json_albums_info_includes_unpadded_track_stream_url():
         "seokey": "test-track",
         "urls": {"medium": {"message": encrypted_link(stream_url)}}
     }
+    # The albumDetail payload is formatted directly (no second albumDetail request); a
+    # track without title/artwork is looked up with songDetail.
     formatter = AlbumTracksFormatter([
-        {"tracks": [{"seokey": "test-track"}]},
         {"tracks": [track]},
     ])
 
     result = await formatter.format_json_albums(
-        {"album": {"seokey": "test-album"}}, info=True
+        {"album": {"seokey": "test-album"}, "tracks": [{"seokey": "test-track"}]}, info=True
     )
 
     assert result["tracks"][0]["stream_urls"]["urls"]["medium_quality"] == stream_url
+    assert formatter._safe_request.await_count == 1

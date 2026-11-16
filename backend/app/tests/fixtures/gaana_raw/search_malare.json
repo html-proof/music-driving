@@ -1,0 +1,797 @@
+{
+ "gr": [
+  {
+   "ty": "Track",
+   "gd": [
+    {
+     "iid": "712492",
+     "id": 712492,
+     "ti": "Malare",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/R7vKX6WmrP/7vKXx7gKmr/size_m.jpg",
+     "sti": "S. Janaki,Vidyasagar,S. P. Balasubrahmanyam",
+     "lang": [
+      "Tamil"
+     ],
+     "seo": "malare",
+     "ty": "Track",
+     "language": "Tamil",
+     "scoreF": 15947.44,
+     "hf": 1,
+     "boostValue": 105.52056813316452,
+     "isPc": "0",
+     "alist": "[S. Janaki,Vidyasagar,S. P. Balasubrahmanyam]",
+     "isrc": "INM129400624",
+     "cat": "Love Story",
+     "pw": 0,
+     "tags": [
+      "Happy",
+      "Romance"
+     ],
+     "langBoostValue": 53.65807208320251
+    },
+    {
+     "iid": "80308685",
+     "id": 80308685,
+     "ti": "Malare Mounama",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/w4MKPObojg/MKPkVOerbo/size_m.jpg",
+     "sti": "Vidyasagar,Vairamuthu,S. P. Balasubrahmanyam",
+     "lang": [
+      "Tamil"
+     ],
+     "seo": "malare-mounama-A3mn711GWN",
+     "ty": "Track",
+     "language": "Tamil",
+     "scoreF": 24016.521,
+     "boostValue": 48.40719559481953,
+     "isPc": "0",
+     "alist": "[Vidyasagar,Vairamuthu,S. P. Balasubrahmanyam]",
+     "isrc": "IND292510478",
+     "pw": 0,
+     "langBoostValue": 24.025731864075713
+    },
+    {
+     "iid": "13820833",
+     "id": 13820833,
+     "ti": "Malare",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/oAJbDElKnL/AJbD75njWn/size_m.jpg",
+     "sti": "Vijay Yesudas",
+     "lang": [
+      "Malayalam"
+     ],
+     "seo": "malare-7",
+     "ty": "Track",
+     "language": "Malayalam",
+     "scoreF": 791.8968,
+     "boostValue": 92.67919128156306,
+     "isPc": "0",
+     "alist": "[Vijay Yesudas]",
+     "isrc": "INM811456901",
+     "cat": "Love Story",
+     "pw": 0,
+     "tags": [
+      "Romance"
+     ],
+     "langBoostValue": 49.994034265130296
+    },
+    {
+     "iid": "71462098",
+     "id": 71462098,
+     "ti": "Malare Malare Unekendru",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/d41WjznWPL/1Wj1Gwrz3P/size_m_1774958738.jpg",
+     "sti": "T. Rajendran,P. Susheela",
+     "lang": [
+      "Tamil"
+     ],
+     "seo": "malare-malare-unekendru-2098-7146",
+     "ty": "Track",
+     "language": "Tamil",
+     "scoreF": 20453.148,
+     "boostValue": 40.74090891626035,
+     "isPc": "0",
+     "alist": "[T. Rajendran,P. Susheela]",
+     "isrc": "INK120905073",
+     "pw": 0,
+     "langBoostValue": 20.04820427324912
+    },
+    {
+     "iid": "36198899",
+     "id": 36198899,
+     "ti": "Gulmuhar Malare",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/10q3Zj1352/q3ZR1Dy035/size_m_1620285957.jpg",
+     "sti": "Hariharan,Timmi,Anupama Deshapande",
+     "lang": [
+      "Tamil"
+     ],
+     "seo": "gulmuhar-malare-12",
+     "ty": "Track",
+     "language": "Tamil",
+     "scoreF": 604.94275,
+     "boostValue": 87.08188855854792,
+     "isPc": "0",
+     "alist": "[Hariharan,Timmi,Anupama Deshapande]",
+     "isrc": "INH100109240",
+     "isDolby": true,
+     "pw": 0,
+     "langBoostValue": 44.091464438387426
+    },
+    {
+     "iid": "82706",
+     "id": 82706,
+     "ti": "Malare Kurinji Malare",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/ZaP37RKDy7/aP37N69KDy/size_m.jpg",
+     "sti": "K J Yesudas,S. Janaki",
+     "lang": [
+      "Tamil"
+     ],
+     "seo": "malare-kurinji-malare-1",
+     "ty": "Track",
+     "language": "Tamil",
+     "scoreF": 571.1844,
+     "boostValue": 64.44424259409068,
+     "isPc": "0",
+     "alist": "[K J Yesudas,S. Janaki]",
+     "isrc": "INH100072550",
+     "cat": "Love Story",
+     "pw": 0,
+     "tags": [
+      "Old",
+      "Romance"
+     ],
+     "langBoostValue": 32.34629168521878
+    },
+    {
+     "iid": "74266147",
+     "id": 74266147,
+     "ti": "Mala Re (ORIGINAL)",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/DwPKOxB3qV/PKORQR9Ybq/size_m.jpg",
+     "sti": "Jeet Gannguli",
+     "lang": [
+      "Bengali"
+     ],
+     "seo": "mala-re-original",
+     "ty": "Track",
+     "language": "Bengali",
+     "scoreF": 15682.109,
+     "boostValue": 74.67671264036427,
+     "isPc": "0",
+     "alist": "[Jeet Gannguli]",
+     "isrc": "INS2X1100040",
+     "pw": 0,
+     "langBoostValue": 35.489835031962976
+    },
+    {
+     "iid": "34055724",
+     "id": 34055724,
+     "ti": "Malare Oru Varthai",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/qa4WEqqWP1/4WEkvzgeKP/size_m.jpg",
+     "sti": "Hariharan,Sujatha Mohan",
+     "lang": [
+      "Tamil"
+     ],
+     "seo": "malare-oru-varthai",
+     "ty": "Track",
+     "language": "Tamil",
+     "scoreF": 422.30048,
+     "boostValue": 60.60110209101956,
+     "isPc": "0",
+     "alist": "[Hariharan,Sujatha Mohan]",
+     "isrc": "INS289900183",
+     "pw": 0,
+     "tags": [
+      "Folk"
+     ],
+     "langBoostValue": 30.352341024706632
+    },
+    {
+     "iid": "78253143",
+     "id": 78253143,
+     "ti": "Muthu Malare",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/YoEWlabzXB/EWlA6jLabz/size_m.jpg",
+     "sti": "Harikrishnan",
+     "lang": [
+      "Malayalam"
+     ],
+     "seo": "muthu-malare",
+     "ty": "Track",
+     "language": "Malayalam",
+     "scoreF": 9100.404,
+     "boostValue": 40,
+     "isPc": "0",
+     "alist": "[Harikrishnan]",
+     "isrc": "INM2W2500531",
+     "pw": 0,
+     "langBoostValue": 20.91842366707142
+    },
+    {
+     "iid": "13992444",
+     "id": 13992444,
+     "ti": "Malare Unplugged",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/ZaP374RWDy/aP37XB2xWD/size_m.jpg",
+     "sti": "Vijay Yesudas",
+     "lang": [
+      "Malayalam"
+     ],
+     "seo": "malare-unplugged",
+     "ty": "Track",
+     "language": "Malayalam",
+     "scoreF": 376.09503,
+     "boostValue": 52.537755298765255,
+     "isPc": "0",
+     "alist": "[Vijay Yesudas]",
+     "isrc": "INM811456919",
+     "cat": "Love Story",
+     "pw": 0,
+     "tags": [
+      "Romance"
+     ],
+     "langBoostValue": 27.8384784737638
+    },
+    {
+     "iid": "39928582",
+     "id": 39928582,
+     "ti": "Velli Malare",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/10q3Zj1352/q3ZRa4w235/size_m_1729427734.jpg",
+     "sti": "Mahalakshmi Iyer,S. P. Balasubrahmanyam,A. R. Rahman",
+     "lang": [
+      "Tamil"
+     ],
+     "seo": "velli-malare",
+     "ty": "Track",
+     "language": "Tamil",
+     "scoreF": 8695.768,
+     "boostValue": 75.8176691174119,
+     "isPc": "0",
+     "alist": "[Mahalakshmi Iyer,S. P. Balasubrahmanyam,A. R. Rahman]",
+     "isrc": "INN139900549",
+     "pw": 0,
+     "langBoostValue": 38.24720821698241
+    },
+    {
+     "iid": "62017691",
+     "id": 62017691,
+     "ti": "Malare Malare (From \"Un Kannil Neer Vazhinthaal\")",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/dwN398KDPa/N394DQMNKD/size_m.jpg",
+     "sti": "Ilaiyaraaja,S. Janaki",
+     "lang": [
+      "Tamil"
+     ],
+     "seo": "malare-malare-11",
+     "ty": "Track",
+     "language": "Tamil",
+     "scoreF": 8032.898,
+     "boostValue": 32.6238511806426,
+     "isPc": "0",
+     "alist": "[Ilaiyaraaja,S. Janaki]",
+     "isrc": "INS172100587",
+     "pw": 0,
+     "langBoostValue": 15.836801484197677
+    },
+    {
+     "iid": "66798607",
+     "id": 66798607,
+     "ti": "Malare Manmiziyale",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/ZaP37RKDy7/P37l592lWD/size_m.jpg",
+     "sti": "Yuvan Shankar Raja,V. Devanand,Joffy Tharakan",
+     "lang": [
+      "Malayalam"
+     ],
+     "seo": "malare-manmiziyale",
+     "ty": "Track",
+     "language": "Malayalam",
+     "scoreF": 7899.8013,
+     "boostValue": 45.54509540972721,
+     "isPc": "0",
+     "alist": "[Yuvan Shankar Raja,V. Devanand,Joffy Tharakan]",
+     "isrc": "INA980700005",
+     "pw": 0,
+     "langBoostValue": 23.978968655330174
+    },
+    {
+     "iid": "77207576",
+     "id": 77207576,
+     "ti": "SEVVAMBAL MALARE",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/qa4WEqqWP1/4WEmXjL5WP/size_m.jpg",
+     "sti": "Nincy",
+     "lang": [
+      "Telugu"
+     ],
+     "seo": "sevvambal-malare",
+     "ty": "Track",
+     "language": "Telugu",
+     "scoreF": 7885.19,
+     "boostValue": 35.0665272051583,
+     "isPc": "0",
+     "alist": "[Nincy]",
+     "isrc": "INS2Y2607010",
+     "pw": 0,
+     "langBoostValue": 16.38576828130538
+    },
+    {
+     "iid": "74828384",
+     "id": 74828384,
+     "ti": "Vaadinen Malare",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/koMWQ4B3qL/MWQVvnDAbq/size_m.jpg",
+     "sti": "Sean Roldan",
+     "lang": [
+      "Tamil"
+     ],
+     "seo": "vaadinen-malare",
+     "ty": "Track",
+     "language": "Tamil",
+     "scoreF": 7569.4,
+     "boostValue": 33.68517774455003,
+     "isPc": "0",
+     "alist": "[Sean Roldan]",
+     "isrc": "INS172604682",
+     "pw": 0,
+     "langBoostValue": 16.387453431851213
+    },
+    {
+     "iid": "77620295",
+     "id": 77620295,
+     "ti": "Lilly Malarey (From \"Varavu\")",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/Dk9KN2KBx1/9KNndRl6KB/size_m.jpg",
+     "sti": "Sam C.S,M G Sreekumar,B. K. Harinarayanan",
+     "lang": [
+      "Malayalam"
+     ],
+     "seo": "lilly-malarey-from-varavu-4W8P9k84Wx",
+     "ty": "Track",
+     "language": "Malayalam",
+     "scoreF": 7020.88,
+     "boostValue": 66.91651324188808,
+     "isPc": "0",
+     "alist": "[Sam C.S,M G Sreekumar,B. K. Harinarayanan]",
+     "isrc": "INSM32600083",
+     "pw": 0,
+     "langBoostValue": 35.7746513091335
+    },
+    {
+     "iid": "51261547",
+     "id": 51261547,
+     "ti": "Malare Mounama",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/a7LWBaz3zX/LWBkVRxzbz/size_m.jpg",
+     "sti": "Sreejit Somanathan",
+     "lang": [
+      "Tamil"
+     ],
+     "seo": "malare-mounama-5",
+     "ty": "Track",
+     "language": "Tamil",
+     "scoreF": 6976.95,
+     "boostValue": 40.134599649763814,
+     "isPc": "0",
+     "alist": "[Sreejit Somanathan]",
+     "isrc": "TCAGZ2313156",
+     "pw": 0,
+     "langBoostValue": 19.733630616251848
+    },
+    {
+     "iid": "21882501",
+     "id": 21882501,
+     "ti": "Malare Kurinji Malare",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/w4MKPObojg/4MKPMEzA3o/size_m.jpg",
+     "sti": "Soolamangalam Sisters",
+     "lang": [
+      "Tamil"
+     ],
+     "seo": "malare-kurinji-malare-2",
+     "ty": "Track",
+     "language": "Tamil",
+     "scoreF": 6865.0894,
+     "boostValue": 39.14310134442846,
+     "isPc": "0",
+     "alist": "[Soolamangalam Sisters]",
+     "isrc": "INH100117990",
+     "pw": 0,
+     "langBoostValue": 19.219207919699315
+    },
+    {
+     "iid": "27450928",
+     "id": 27450928,
+     "ti": "Malare Thendral Paadum",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/DwPKOBbqVZ/wPKO9dGaWq/size_m.jpg",
+     "sti": "Arun Mozhi,S. Janaki",
+     "lang": [
+      "Tamil"
+     ],
+     "seo": "malare-thendral-paadum",
+     "ty": "Track",
+     "language": "Tamil",
+     "scoreF": 6821.198,
+     "boostValue": 39.33619933580469,
+     "isPc": "0",
+     "alist": "[Arun Mozhi,S. Janaki]",
+     "isrc": "INM6E9402059",
+     "pw": 0,
+     "langBoostValue": 19.319393657675985
+    },
+    {
+     "iid": "22206481",
+     "id": 22206481,
+     "ti": "Malare Kurunji Malare",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/zLp36v3rGe/Lp3648DEbr/size_m.jpg",
+     "sti": "K J Yesudas,S. Janaki",
+     "lang": [
+      "Tamil"
+     ],
+     "seo": "malare-kurunji-malare-4",
+     "ty": "Track",
+     "language": "Tamil",
+     "scoreF": 6517.88,
+     "boostValue": 36.96097555462828,
+     "isPc": "0",
+     "alist": "[K J Yesudas,S. Janaki]",
+     "isrc": "INH100504890",
+     "cat": "Love Story",
+     "pw": 0,
+     "tags": [
+      "Romance"
+     ],
+     "langBoostValue": 18.087047605389785
+    },
+    {
+     "iid": "52387",
+     "id": 52387,
+     "ti": "Malarendra Mugamondru",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/6Zxb27K9wN/Zxb2LBq39w/size_m.jpg",
+     "sti": "L.R. Eswari,M.S. Raju",
+     "lang": [
+      "Tamil"
+     ],
+     "seo": "malarendra-mugamondru",
+     "ty": "Track",
+     "language": "Tamil",
+     "scoreF": 6478.9863,
+     "boostValue": 65.08142551570161,
+     "isPc": "0",
+     "alist": "[L.R. Eswari,M.S. Raju]",
+     "isrc": "INH100301790",
+     "pw": 0,
+     "tags": [
+      "Party",
+      "Happy",
+      "Old",
+      "Retro"
+     ],
+     "langBoostValue": 32.676883633756155
+    },
+    {
+     "iid": "24021023",
+     "id": 24021023,
+     "ti": "Malare Enna Kolam",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/dwN39y83DP/wN39oDdbDP/size_m_1532892713.jpg",
+     "sti": "S. P. Balasubrahmanyam",
+     "lang": [
+      "Tamil"
+     ],
+     "seo": "malare-enna-kolam",
+     "ty": "Track",
+     "language": "Tamil",
+     "scoreF": 6478.3677,
+     "boostValue": 37.55308790793307,
+     "isPc": "0",
+     "alist": "[S. P. Balasubrahmanyam]",
+     "isrc": "INH101300106",
+     "pw": 0,
+     "tags": [
+      "Old",
+      "Sad"
+     ],
+     "langBoostValue": 18.394255425927707
+    },
+    {
+     "iid": "82698302",
+     "id": 82698302,
+     "ti": "Mälarens Lucia",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/w4MKPDOKoj/MKPk7x8rbo/size_m.jpg",
+     "sti": "Jens Hult",
+     "lang": [
+      "Swedish"
+     ],
+     "seo": "mlarens-lucia",
+     "ty": "Track",
+     "language": "Swedish",
+     "scoreF": 6203.986,
+     "boostValue": 20.542999483776516,
+     "isPc": "0",
+     "alist": "[Jens Hult]",
+     "isrc": "SEUM72601578",
+     "pw": 0,
+     "langBoostValue": 12.6764722549842
+    },
+    {
+     "iid": "23373727",
+     "id": 23373727,
+     "ti": "Malare Mounamay",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/DwPKOxB3qV/wPKO2LZVbq/size_m_1785009979.jpg",
+     "sti": "Shameer Madathara",
+     "lang": [
+      "Malayalam"
+     ],
+     "seo": "malare-mounamay",
+     "ty": "Track",
+     "language": "Malayalam",
+     "scoreF": 6020.602,
+     "boostValue": 34.89956379453393,
+     "isPc": "0",
+     "alist": "[Shameer Madathara]",
+     "isrc": "INM251619884",
+     "pw": 0,
+     "langBoostValue": 18.10330267939835
+    },
+    {
+     "iid": "21350066",
+     "id": 21350066,
+     "ti": "The Romance Of Power Paandi - Venpani Malare (Male)",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/Bp1bAnK029/p1bAZ6Q4K0/size_m_1779449720.jpg",
+     "sti": "Sean Roldan,Dhanush",
+     "lang": [
+      "Tamil"
+     ],
+     "seo": "the-romance-of-power-paandi-venpani-malare-male",
+     "ty": "Track",
+     "language": "Tamil",
+     "scoreF": 5311.2935,
+     "boostValue": 67.35438605775954,
+     "isPc": "0",
+     "alist": "[Sean Roldan,Dhanush]",
+     "isrc": "IND291701351",
+     "pw": 0,
+     "tags": [
+      "Party",
+      "Happy"
+     ],
+     "langBoostValue": 33.85617207520989
+    },
+    {
+     "iid": "52481741",
+     "id": 52481741,
+     "ti": "Malare Pesu",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/Rz4W8vKxD5/4W87NQ4J3x/size_m_1765353821.jpg",
+     "sti": "Ilaiyaraaja,K. S. Chithra",
+     "lang": [
+      "Tamil"
+     ],
+     "seo": "malare-pesu-1",
+     "ty": "Track",
+     "language": "Tamil",
+     "scoreF": 5117.891,
+     "boostValue": 29.513640835585257,
+     "isPc": "0",
+     "alist": "[Ilaiyaraaja,K. S. Chithra]",
+     "isrc": "INS172004418",
+     "pw": 0,
+     "langBoostValue": 14.223119661505269
+    },
+    {
+     "iid": "82939001",
+     "id": 82939001,
+     "ti": "MANADHAI MAYAKKUM MALARE",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/d41WjnWPLq/1Wj02aaNKP/size_m.jpg",
+     "sti": "Hari Raveendran,Jim Jacob",
+     "lang": [
+      "Tamil"
+     ],
+     "seo": "manadhai-mayakkum-malare",
+     "ty": "Track",
+     "language": "Tamil",
+     "scoreF": 4970.4834,
+     "boostValue": 21.9147880295777,
+     "isPc": "0",
+     "alist": "[Hari Raveendran,Jim Jacob]",
+     "isrc": "INP2X2501472",
+     "pw": 0,
+     "langBoostValue": 10.280579033712616
+    },
+    {
+     "iid": "23404228",
+     "id": 23404228,
+     "ti": "Malare Malare",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/mGjKr1b6zX/GjKrvQzVK6/size_m_1779777435.jpg",
+     "sti": "Dhivya",
+     "lang": [
+      "Malayalam"
+     ],
+     "seo": "malare-malare-4",
+     "ty": "Track",
+     "language": "Malayalam",
+     "scoreF": 4940.958,
+     "boostValue": 20.050968375888424,
+     "isPc": "0",
+     "alist": "[Dhivya]",
+     "isrc": "INM251303400",
+     "pw": 0,
+     "langBoostValue": 9.907809016386148
+    },
+    {
+     "iid": "77667836",
+     "id": 77667836,
+     "ti": "Malare Malare",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/lJvKa63DV9/vKaXZ0mAbD/size_m_1784028022.jpg",
+     "sti": "Afsal Thuvoor",
+     "lang": [
+      "Malayalam"
+     ],
+     "seo": "malare-malare-w3v8QEqjbj",
+     "ty": "Track",
+     "language": "Malayalam",
+     "scoreF": 4743.311,
+     "boostValue": 6.7254550566359494,
+     "isPc": "0",
+     "alist": "[Afsal Thuvoor]",
+     "isrc": "AEA0E5010041",
+     "pw": 0,
+     "langBoostValue": 2.5529611748735785
+    },
+    {
+     "iid": "63798388",
+     "id": 63798388,
+     "ti": "Malare Thendral (From \"Veetla Visheshanga\")",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/NOXWVRgWkq/XWVyyk9w3k/size_m.jpg",
+     "sti": "Arunmozhi",
+     "lang": [
+      "Tamil"
+     ],
+     "seo": "malare-thendral-from-veetla-visheshanga",
+     "ty": "Track",
+     "language": "Tamil",
+     "scoreF": 4544.4185,
+     "boostValue": 26.24878561610265,
+     "isPc": "0",
+     "alist": "[Arunmozhi]",
+     "isrc": "FR2X41784308",
+     "pw": 0,
+     "langBoostValue": 12.52920287231641
+    },
+    {
+     "iid": "25041927",
+     "id": 25041927,
+     "ti": "Malare Malare",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/6Zxb2r7b9w/Zxb2EdpgW9/size_m.jpg",
+     "sti": "Vinod VenugopalAcharya",
+     "lang": [
+      "Tamil"
+     ],
+     "seo": "malare-malare-5",
+     "ty": "Track",
+     "language": "Tamil",
+     "scoreF": 4501.275,
+     "boostValue": 18.13428515351551,
+     "isPc": "0",
+     "alist": "[Vinod VenugopalAcharya]",
+     "isrc": "INT131810954",
+     "pw": 0,
+     "langBoostValue": 8.319126882595988
+    },
+    {
+     "iid": "21350067",
+     "id": 21350067,
+     "ti": "The Romance Of Power Paandi - Venpani Malare (Female)",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/Bp1bAnK029/p1bAZ6Q4K0/size_m_1779449720.jpg",
+     "sti": "Shweta Mohan,Dhanush,Sean Roldan",
+     "lang": [
+      "Tamil"
+     ],
+     "seo": "the-romance-of-power-paandi-venpani-malare-female",
+     "ty": "Track",
+     "language": "Tamil",
+     "scoreF": 4382.084,
+     "boostValue": 54.832050630258806,
+     "isPc": "0",
+     "alist": "[Shweta Mohan,Dhanush,Sean Roldan]",
+     "isrc": "IND291701352",
+     "pw": 0,
+     "langBoostValue": 27.359162929469132
+    },
+    {
+     "iid": "1618915",
+     "id": 1618915,
+     "ti": "Malare Malare Theriyatha",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/4Z9bqgo3yQ/Z9bqgXy53y/size_m.jpg",
+     "sti": "P. Susheela",
+     "lang": [
+      "Tamil"
+     ],
+     "seo": "malare-malare-theriyatha-1",
+     "ty": "Track",
+     "language": "Tamil",
+     "scoreF": 4371.5737,
+     "boostValue": 34.68476077230972,
+     "isPc": "0",
+     "alist": "[P. Susheela]",
+     "isrc": "INH100109930",
+     "pw": 0,
+     "tags": [
+      "Happy",
+      "Old"
+     ],
+     "langBoostValue": 16.90607075454484
+    },
+    {
+     "iid": "66565587",
+     "id": 66565587,
+     "ti": "Malare Kurinji Malare - Drill",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/Dk9KNk23Bx/9KNoL2r93B/size_m.jpg",
+     "sti": "Heart Killer Beats,K J Yesudas,S. Janaki",
+     "lang": [
+      "Tamil"
+     ],
+     "seo": "malare-kurinji-malare-drill",
+     "ty": "Track",
+     "language": "Tamil",
+     "scoreF": 4276.0615,
+     "boostValue": 24.178077660446654,
+     "isPc": "0",
+     "alist": "[Heart Killer Beats,K J Yesudas,S. Janaki]",
+     "isrc": "INH102504943",
+     "pw": 0,
+     "langBoostValue": 11.454849880899994
+    },
+    {
+     "iid": "23232280",
+     "id": 23232280,
+     "ti": "Kanne Thaai Malare",
+     "aw": "https://a10.gaanacdn.com/gn_img/song/g4w3vwrWjJ/w3vBeGBp3j/size_m_1521813099.jpg",
+     "sti": "Shaan Rahman,Vineeth Sreenivasan",
+     "lang": [
+      "Malayalam"
+     ],
+     "seo": "kanne-thaai-malare",
+     "ty": "Track",
+     "language": "Malayalam",
+     "scoreF": 4271.5166,
+     "boostValue": 53.66422894360013,
+     "isPc": "0",
+     "alist": "[Shaan Rahman,Vineeth Sreenivasan]",
+     "isrc": "INM811458827",
+     "pw": 0,
+     "langBoostValue": 28.460221295728072
+    },
+    {
+     "iid": "41558930",
+     "id": 41558930,
+     "ti": "Putham Pudhu Malare",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/9En3peWXDV/n3pqeyGGWX/size_m_1787054970.jpg",
+     "sti": "Bala Bharathi,S. P. Balasubrahmanyam,Vairamuthu",
+     "lang": [
+      "Tamil"
+     ],
+     "seo": "putham-pudhu-malare",
+     "ty": "Track",
+     "language": "Tamil",
+     "scoreF": 4076.6975,
+     "boostValue": 50.91812397308926,
+     "isPc": "0",
+     "alist": "[Bala Bharathi,S. P. Balasubrahmanyam,Vairamuthu]",
+     "isrc": "IND292201133",
+     "pw": 0,
+     "langBoostValue": 25.328486029412296
+    },
+    {
+     "iid": "78252",
+     "id": 78252,
+     "ti": "Virinja Malare",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/4Z9bqZoKyQ/Z9bqay1byQ/size_m.jpg",
+     "sti": "K. P. Udayabhanu,P Leela",
+     "lang": [
+      "Hindi"
+     ],
+     "seo": "virinja-malare",
+     "ty": "Track",
+     "language": "Hindi",
+     "scoreF": 4009.2976,
+     "boostValue": 25.29736429169282,
+     "isPc": "0",
+     "alist": "[K. P. Udayabhanu,P Leela]",
+     "isrc": "INH100324150",
+     "pw": 0,
+     "tags": [
+      "Old"
+     ],
+     "langBoostValue": 10.67674519799918
+    }
+   ]
+  }
+ ]
+}

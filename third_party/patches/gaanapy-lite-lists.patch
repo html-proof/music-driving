@@ -1,0 +1,2535 @@
+diff --git a/api/albums/albums.py b/api/albums/albums.py
+index c8766de..a554c5e 100644
+--- a/api/albums/albums.py
++++ b/api/albums/albums.py
+@@ -1,52 +1,69 @@
+ import asyncio
+ 
++from api.entities import album_row_from_entity, artwork_urls, page_slice, search_items
++from api.errors import UpstreamError, most_severe
++
++# Album tracks without title/artwork in albumDetail are looked up one by one; cap that.
++ALBUM_TRACK_LOOKUP_LIMIT = 100
++
+ 
+ class Albums:
+-    async def search_albums(self, search_query: str, limit: int) -> list:
++    async def search_albums(self, search_query: str, limit: int, page: int = 1) -> list:
++        """Rows built straight from the search hits: one Gaana request, no detail lookups."""
+         endpoints = self.api_endpoints
+         errors = self.errors
+-        result = await self._safe_request("POST", endpoints.search_albums_url + search_query)
++        result = await self._safe_request(
++            "POST", endpoints.search_url, params=endpoints.search_params("album", search_query)
++        )
+         if isinstance(result, dict) and "error" in result:
+             return result
+-        album_ids = []
+-        gd = (result.get('gr') or [{}])[0].get('gd', [])
+-        for i in range(min(limit, len(gd))):
+-            seo = gd[i].get('seo') if isinstance(gd[i], dict) else None
+-            if seo:
+-                album_ids.append(seo)
+-        if len(album_ids) == 0:
++        rows = []
++        seen = set()
++        for item in search_items(result):
++            row = album_row_from_entity(item, require_artwork=False)
++            if row is not None and row["seokey"] not in seen:
++                seen.add(row["seokey"])
++                rows.append(row)
++        rows = page_slice(rows, limit, page)
++        if len(rows) == 0:
+             return await errors.no_results()
+-        album_info = await self.get_album_info(album_ids, False)
+-        return album_info
++        return rows
+ 
+     async def get_album_info(self, album_id: list, info: bool) -> list:
++        """One albumDetail request per album. A failed album is dropped; when all of them
++        failed, the most severe failure (a block first) is raised."""
+         endpoints = self.api_endpoints
+         errors = self.errors
+         results = await asyncio.gather(*[
+             self._safe_request("POST", endpoints.album_details_url + i)
+             for i in album_id
+-        ])
++        ], return_exceptions=True)
+         album_info = []
++        failures = []
+         for result in results:
++            if isinstance(result, BaseException):
++                # Only provider failures are tolerated; a bug must surface as one.
++                if not isinstance(result, UpstreamError):
++                    raise result
++                failures.append(result)
++                continue
+             if isinstance(result, dict) and "error" in result:
+                 continue
+-            album_info.append(await self.format_json_albums(result, info=info))
++            album = await self.format_json_albums(result, info=info)
++            if "error" not in album:
++                album_info.append(album)
+         if len(album_info) == 0:
++            if failures:
++                raise most_severe(failures)
+             return await errors.no_results()
+         return album_info
+ 
+-    async def get_album_tracks(self, album_id: str) -> list:
+-        endpoints = self.api_endpoints
+-        result = await self._safe_request("POST", endpoints.album_details_url + album_id)
+-        if isinstance(result, dict) and "error" in result:
+-            return result
+-        track_seokeys = []
+-        for i in result.get('tracks', []):
+-            seo = i.get('seokey') if isinstance(i, dict) else None
+-            if seo:
+-                track_seokeys.append(seo)
+-        result = await self.get_track_info(track_seokeys)
+-        return result
++    async def get_album_tracks(self, results: dict) -> list:
++        """Song rows for the tracks of an albumDetail payload (no second albumDetail call)."""
++        tracks = results.get('tracks') if isinstance(results, dict) else None
++        if not isinstance(tracks, list) or not tracks:
++            return []
++        return await self.songs_from_entities(tracks, ALBUM_TRACK_LOOKUP_LIMIT)
+ 
+     async def format_json_albums(self, results: dict, info: bool = False) -> dict:
+         functions = self.functions
+@@ -61,18 +78,24 @@ class Albums:
+         data['album_id'] = album.get('album_id', '')
+         data['title'] = album.get('title', '')
+         try:
+-            data['artists'] = await functions.findArtistNames(
+-                album.get('artist') or []
+-            )
+-            tracks = results.get('tracks')
+-            first_track_artist = (
+-                tracks[0].get('artist') or []
+-                if tracks and isinstance(tracks, list) and len(tracks) > 0
+-                else []
+-            )
+-            data['artist_seokeys'] = await functions.findArtistSeoKeys(first_track_artist)
+-            data['artist_ids'] = await functions.findArtistIds(first_track_artist)
+-        except (KeyError, IndexError):
++            album_artist = album.get('artist') or []
++            data['artists'] = await functions.findArtistNames(album_artist)
++            # The album's own artist list gives keys that match the names above. Only
++            # when it has none, borrow the first track's - and only if that track is
++            # credited to exactly the same artists, so names and keys still pair up.
++            data['artist_seokeys'] = await functions.findArtistSeoKeys(album_artist)
++            data['artist_ids'] = await functions.findArtistIds(album_artist)
++            if not data['artist_seokeys']:
++                tracks = results.get('tracks')
++                first_track_artist = (
++                    tracks[0].get('artist') or []
++                    if tracks and isinstance(tracks, list) and isinstance(tracks[0], dict)
++                    else []
++                )
++                if first_track_artist and await functions.findArtistNames(first_track_artist) == data['artists']:
++                    data['artist_seokeys'] = await functions.findArtistSeoKeys(first_track_artist)
++                    data['artist_ids'] = await functions.findArtistIds(first_track_artist)
++        except (KeyError, IndexError, AttributeError):
+             data['artists'] = ""
+             data['artist_seokeys'] = ""
+             data['artist_ids'] = ""
+@@ -87,12 +110,13 @@ class Albums:
+         data['play_count'] = album.get('al_play_ct', '')
+         data['favorite_count'] = album.get('favorite_count', '')
+         data['album_url'] = f"https://gaana.com/album/{data['seokey']}"
+-        artwork = album.get('artwork', '')
++        artwork = album.get('artwork') or ''
++        sizes = artwork_urls(artwork)
+         data['images'] = {'urls': {}}
+-        data['images']['urls']['large_artwork'] = artwork.replace("size_s.jpg", "size_l.jpg") if artwork else ''
+-        data['images']['urls']['medium_artwork'] = artwork.replace("size_s.jpg", "size_m.jpg") if artwork else ''
+-        data['images']['urls']['small_artwork'] = artwork
++        data['images']['urls']['large_artwork'] = sizes['large_artwork']
++        data['images']['urls']['medium_artwork'] = sizes['medium_artwork']
++        data['images']['urls']['small_artwork'] = sizes['small_artwork']
+ 
+         if info:
+-            data['tracks'] = await self.get_album_tracks(data['seokey'])
++            data['tracks'] = await self.get_album_tracks(results)
+         return data
+diff --git a/api/artists/artists.py b/api/artists/artists.py
+index cd914ed..bc6ff83 100644
+--- a/api/artists/artists.py
++++ b/api/artists/artists.py
+@@ -1,55 +1,73 @@
+ import asyncio
+ 
++from api.entities import artist_row_from_entity, page_slice, search_items
++from api.errors import UpstreamError, most_severe
++
++
+ class Artists:
+-    async def search_artists(self, search_query: str, limit: int) -> list:
++    async def search_artists(self, search_query: str, limit: int, page: int = 1) -> list:
++        """Rows built straight from the search hits: one Gaana request, no detail lookups."""
+         endpoints = self.api_endpoints
+         errors = self.errors
+-        result = await self._safe_request("POST", endpoints.search_artists_url + search_query)
++        result = await self._safe_request(
++            "POST", endpoints.search_url, params=endpoints.search_params("artist", search_query)
++        )
+         if isinstance(result, dict) and "error" in result:
+             return result
+-        artist_ids = []
+-        gd = (result.get('gr') or [{}])[0].get('gd', [])
+-        for i in range(min(limit, len(gd))):
+-            seo = gd[i].get('seo') if isinstance(gd[i], dict) else None
+-            if seo:
+-                artist_ids.append(seo)
+-        if len(artist_ids) == 0:
++        rows = []
++        seen = set()
++        for item in search_items(result):
++            row = artist_row_from_entity(item)
++            if row is not None and row["seokey"] not in seen:
++                seen.add(row["seokey"])
++                rows.append(row)
++        rows = page_slice(rows, limit, page)
++        if len(rows) == 0:
+             return await errors.no_results()
+-        artist_info = await self.get_artist_info(artist_ids, False)
+-        return artist_info
++        return rows
+ 
+     async def get_artist_info(self, artist_id: list, info: bool, limit: int = 10, page: int = 1) -> list:
++        """One artistDetail request per artist. A failed artist is dropped; when all of
++        them failed, the most severe failure (a block first) is raised."""
+         endpoints = self.api_endpoints
+         errors = self.errors
+         results = await asyncio.gather(*[
+             self._safe_request("POST", endpoints.artist_details_url + i)
+             for i in artist_id
+-        ])
++        ], return_exceptions=True)
+         artist_info = []
++        failures = []
+         for result in results:
++            if isinstance(result, BaseException):
++                # Only provider failures are tolerated; a bug must surface as one.
++                if not isinstance(result, UpstreamError):
++                    raise result
++                failures.append(result)
++                continue
+             if isinstance(result, dict) and "error" in result:
+                 continue
+-            artist_info.append(await self.format_json_artists(result, limit, page, info=info))
++            artist = await self.format_json_artists(result, limit, page, info=info)
++            if "error" not in artist:
++                artist_info.append(artist)
+         if len(artist_info) == 0:
++            if failures:
++                raise most_severe(failures)
+             return await errors.no_results()
+         return artist_info
+ 
+     async def get_top_tracks(self, artist_id: str, limit: int = 10, page: int = 1) -> dict:
++        """The artist's tracks, one page of them, built from the track-list payload
++        (songDetail only for entries that lack title or artwork)."""
+         endpoints = self.api_endpoints
+-        result = await self._safe_request("POST", endpoints.artist_top_tracks + artist_id)
++        result = await self._safe_request("POST", endpoints.artist_top_tracks + str(artist_id))
+         if isinstance(result, dict) and "error" in result:
+-            return result
+-        track_seokeys = []
+-        for track in result.get('entities', []):
+-            seo = track.get('seokey') if isinstance(track, dict) else None
+-            if seo:
+-                track_seokeys.append(seo)
+-        total = len(track_seokeys)
+-        offset = (page - 1) * limit
+-        paginated_seokeys = track_seokeys[offset:offset + limit]
+-        tracks = await self.get_track_info(paginated_seokeys)
+-        if isinstance(tracks, dict) and "error" in tracks:
+-            return {"tracks": [], "total": total}
++            return {"tracks": [], "total": 0}
++        entities = [
++            entity for entity in result.get('entities') or []
++            if isinstance(entity, dict) and entity.get('seokey')
++        ]
++        total = len(entities)
++        tracks = await self.songs_from_entities(page_slice(entities, limit, page), limit)
+         return {"tracks": tracks, "total": total}
+ 
+     async def get_similar_artists(self, artist_id: str, limit: int) -> dict:
+diff --git a/api/charts/charts.py b/api/charts/charts.py
+index 8a2a22f..8d515e5 100644
+--- a/api/charts/charts.py
++++ b/api/charts/charts.py
+@@ -1,5 +1,7 @@
+ import asyncio
+ 
++from api.entities import artwork_urls
++
+ class Charts:
+     async def get_charts(self, limit: int) -> list:
+         endpoints = self.api_endpoints
+@@ -31,9 +33,10 @@ class Charts:
+         )
+         data['play_count'] = entity_info[-1].get('value', '') if entity_info else ''
+         data['playlist_url'] = f"https://gaana.com/playlist/{data['seokey']}" if data['seokey'] else ''
+-        atw = results.get('atw', '')
++        atw = results.get('atw') or ''
++        sizes = artwork_urls(atw)
+         data['images'] = {'urls': {}}
+-        data['images']['urls']['large_artwork'] = atw.replace("size_m.jpg", "size_l.jpg") if atw else ''
++        data['images']['urls']['large_artwork'] = sizes['large_artwork']
+         data['images']['urls']['medium_artwork'] = atw
+-        data['images']['urls']['small_artwork'] = atw.replace("size_m.jpg", "size_s.jpg") if atw else ''
++        data['images']['urls']['small_artwork'] = sizes['small_artwork']
+         return data
+diff --git a/api/discovery/discovery.py b/api/discovery/discovery.py
+index 6f28638..aa8ff63 100644
+--- a/api/discovery/discovery.py
++++ b/api/discovery/discovery.py
+@@ -1,6 +1,7 @@
+ import asyncio
+ 
+ 
++
+ class Discovery:
+     """Methods for Gaana's newer discovery endpoints."""
+ 
+@@ -36,16 +37,11 @@ class Discovery:
+         records = self._track_records(result)
+         if not records:
+             return await self.errors.no_results()
+-        records = [self._format_artist_track_record(record) for record in records]
+-        seokeys = [record.get("seokey") for record in records if isinstance(record, dict)]
+-        if seokeys and hasattr(self, "get_track_info"):
+-            tracks = await self.get_track_info(seokeys[:limit])
+-        else:
+-            tracks = await asyncio.gather(*[
+-                self.format_json_songs(record) for record in records[:limit]
+-            ])
+-        if isinstance(tracks, dict) and "error" in tracks:
+-            return tracks
++        # The records already carry title, artwork, artists, album and the stream link:
++        # build the rows from them; songDetail only for records that lack those.
++        tracks = await self.songs_from_entities(records, limit)
++        if not tracks:
++            return await self.errors.no_results()
+         return {"tracks": tracks, "total": result.get("total", len(records))}
+ 
+     async def format_discovered_album(self, record: dict) -> dict:
+@@ -91,35 +87,6 @@ class Discovery:
+             return []
+         return result.get("tracks") or result.get("entities") or result.get("data") or []
+ 
+-    @staticmethod
+-    def _format_artist_track_record(record: dict) -> dict:
+-        values = {
+-            item.get("key"): item.get("value")
+-            for item in record.get("entity_info", [])
+-            if isinstance(item, dict) and item.get("key")
+-        }
+-        stream = values.get("stream_url") or {}
+-        medium = stream.get("medium") if isinstance(stream, dict) else {}
+-        album = values.get("album") or [{}]
+-        album = album[0] if isinstance(album, list) and album else {}
+-        return {
+-            "seokey": record.get("seokey", ""),
+-            "track_id": record.get("entity_id", ""),
+-            "track_title": record.get("name", ""),
+-            "artist": values.get("artist") or [],
+-            "albumseokey": album.get("album_seokey", ""),
+-            "album_title": album.get("name", ""),
+-            "album_id": album.get("album_id", ""),
+-            "language": record.get("language", ""),
+-            "artwork_large": record.get("artwork_medium", ""),
+-            "artwork_web": record.get("atw", ""),
+-            "artwork": record.get("artwork", ""),
+-            "duration": values.get("duration", ""),
+-            "parental_warning": values.get("parental_warning", 0),
+-            "play_ct": values.get("play_ct", ""),
+-            "urls": {"medium": medium} if isinstance(medium, dict) else {},
+-        }
+-
+     @staticmethod
+     def _is_seokey_only(record: dict) -> bool:
+         return set(record) <= {"seokey", "seo"} and bool(record.get("seokey") or record.get("seo"))
+diff --git a/api/endpoints.py b/api/endpoints.py
+index 1fcdcd3..e99b07a 100644
+--- a/api/endpoints.py
++++ b/api/endpoints.py
+@@ -1,5 +1,4 @@
+ trending_url = "https://gaana.com/apiv2?type=miscTrendingSongs"
+-search_songs_url = "https://gaana.com/apiv2?country=IN&page=0&secType=track&type=search&keyword="
+ song_details_url = "https://gaana.com/apiv2?type=songDetail&seokey="
+ #similar_songs_url = "https://gaana.com/apiv2?type=songSimilar&id=" ## Removed for now as the endpoint seems to return nothing
+ #similar_albums_url = "https://gaana.com/apiv2?type=albumSimilar&id="
+@@ -7,10 +6,23 @@ similar_artists_url = "https://apiv2.gaana.com/player/similar-artists/" ## Mobil
+ playlist_details_url = "https://gaana.com/apiv2?type=playlistDetail&seokey="
+ new_releases_url = "https://gaana.com/apiv2?page=0&type=miscNewRelease&language="
+ charts_url = "https://apiv2.gaana.com/home/playlist/top-charts?view=all&limit=0,"
+-search_artists_url = "https://gaana.com/apiv2?country=IN&page=0&secType=artist&type=search&keyword="
+ artist_details_url = "https://gaana.com/apiv2?type=artistDetail&seokey="
+ artist_top_tracks = "https://gaana.com/apiv2?language=&order=0&page=0&sortBy=popularity&type=artistTrackList&id="
+-search_albums_url = "https://gaana.com/apiv2?country=IN&page=0&secType=album&type=search&keyword="
+ album_details_url = "https://gaana.com/apiv2?type=albumDetail&seokey="
+ similar_albums_url = "https://rec.gaana.com/recommendation/similarAlbums/"
+ artist_tracks_url = "https://apiv2.gaana.com/home/artist/tracks/"
++
++# Search: the keyword goes in as a query parameter (URL-encoded by aiohttp), never
++# concatenated, so any script and characters like "&" reach Gaana intact.
++search_url = "https://gaana.com/apiv2"
++
++
++def search_params(sec_type: str, keyword: str) -> dict:
++    """Query parameters of Gaana's search; sec_type is track, album or artist."""
++    return {
++        "country": "IN",
++        "page": "0",
++        "secType": sec_type,
++        "type": "search",
++        "keyword": keyword,
++    }
+diff --git a/api/entities.py b/api/entities.py
+new file mode 100644
+index 0000000..7d22e44
+--- /dev/null
++++ b/api/entities.py
+@@ -0,0 +1,268 @@
++"""Local fix: build rows straight from Gaana list/search payloads.
++
++Search results and lists (trending, new releases, playlists, albums, artist tracks)
++already carry what a row needs (seokey, id, title, artwork, artists, language). Building
++rows from them costs one Gaana request per list instead of one per row, which is what got
++clients blocked. Rows use the same keys as the full formatters (format_json_songs /
++format_json_albums / format_json_artists) with unknown fields left empty, plus
++"lite": True. Stream links, when the payload has none, are resolved at play time through
++/songs/info/.
++
++Three payload shapes are understood:
++  * search hits (`gr[].gd[]`): seo, id, ti, aw, sti / alist, language / lang
++  * songDetail-like tracks: seokey, track_id, track_title, artwork*, artist[], album_title...
++  * apiv2 entities: seokey, entity_id, name, artwork / atw / artwork_medium, and an
++    `entity_info` list of {key, value} (artist, album, duration, stream_url...)
++"""
++
++import re
++
++_SIZE = re.compile(r"size_[sml](?=[_.])")
++
++
++def artwork_urls(url) -> dict:
++    """small/medium/large variants of a Gaana artwork URL.
++
++    Handles both `size_m.jpg` and timestamped `size_m_1712905431.jpg`; a URL without a
++    size token is used for every size.
++    """
++    url = url if isinstance(url, str) else ""
++    if not url:
++        return {"large_artwork": "", "medium_artwork": "", "small_artwork": ""}
++    return {
++        "large_artwork": _SIZE.sub("size_l", url),
++        "medium_artwork": _SIZE.sub("size_m", url),
++        "small_artwork": _SIZE.sub("size_s", url),
++    }
++
++
++def entity_values(entity: dict) -> dict:
++    """`entity_info: [{key, value}, ...]` as a dict (empty when absent)."""
++    info = entity.get("entity_info") if isinstance(entity, dict) else None
++    if not isinstance(info, list):
++        return {}
++    return {
++        item.get("key"): item.get("value")
++        for item in info
++        if isinstance(item, dict) and item.get("key")
++    }
++
++
++def _first(sources: tuple, *keys):
++    """First non-empty value for any of `keys`, looked up in each source in turn."""
++    for key in keys:
++        for source in sources:
++            value = source.get(key)
++            if value not in (None, "", [], {}):
++                return value
++    return ""
++
++
++def _text(value) -> str:
++    if value is None:
++        return ""
++    if isinstance(value, (list, tuple)):
++        return ", ".join(_text(v) for v in value if _text(v))
++    return str(value).strip()
++
++
++def _names_from_string(value) -> str:
++    """'Mithoon,Arijit Singh' or '[Mithoon,Arijit Singh]' -> 'Mithoon, Arijit Singh'."""
++    if not isinstance(value, str):
++        return ""
++    value = value.strip().strip("[]")
++    return ", ".join(part.strip() for part in value.split(",") if part.strip())
++
++
++def _artist_fields(sources: tuple) -> tuple[str, str, str]:
++    """(names, seokeys, ids), each comma+space joined, from the richest data available.
++
++    Seokeys and ids are only given when every artist has them, so they always pair up
++    with the names by position.
++    """
++    artists = _first(sources, "artist", "artists")
++    if isinstance(artists, list) and artists and all(isinstance(a, dict) for a in artists):
++        names = [_text(a.get("name")) for a in artists]
++        seokeys = [_text(a.get("seokey")) for a in artists]
++        ids = [_text(a.get("artist_id") or a.get("id")) for a in artists]
++        if all(names):
++            return (
++                ", ".join(names),
++                ", ".join(seokeys) if all(seokeys) else "",
++                ", ".join(ids) if all(ids) else "",
++            )
++    if isinstance(artists, str) and artists:
++        return _names_from_string(artists), "", ""
++    return _names_from_string(_first(sources, "sti", "alist", "singers")), "", ""
++
++
++def _language(sources: tuple) -> str:
++    language = _first(sources, "language")
++    if not language:
++        langs = _first(sources, "lang")
++        language = langs[0] if isinstance(langs, list) and langs else langs
++    return _text(language)
++
++
++def _is_explicit(sources: tuple) -> bool:
++    return str(_first(sources, "parental_warning", "pw")) == "1"
++
++
++def _images(sources: tuple) -> dict:
++    """Prefer real per-size fields; derive the missing sizes from whichever URL exists."""
++    base = _first(sources, "atw", "artwork_web", "aw", "artwork", "artwork_large", "artwork_medium")
++    derived = artwork_urls(base)
++    return {"urls": {
++        "large_artwork": _text(_first(sources, "artwork_large", "artwork_medium")) or derived["large_artwork"],
++        "medium_artwork": _text(_first(sources, "artwork_web", "atw")) or derived["medium_artwork"],
++        "small_artwork": _text(_first(sources, "artwork")) or derived["small_artwork"],
++    }}
++
++
++def _album_fields(entity: dict, values: dict) -> tuple[str, str, str]:
++    """(title, seokey, id) of the album a track belongs to."""
++    album = values.get("album") or entity.get("album")
++    if isinstance(album, list):
++        album = album[0] if album and isinstance(album[0], dict) else {}
++    if not isinstance(album, dict):
++        album = {}
++    sources = (entity, album)
++    return (
++        _text(_first(sources, "album_title") or album.get("name") or album.get("title")),
++        _text(_first(sources, "albumseokey", "album_seokey") or album.get("seokey")),
++        _text(_first(sources, "album_id")),
++    )
++
++
++def encrypted_stream(entity: dict) -> str:
++    """The encrypted 'medium' stream link the entity carries, if any."""
++    if not isinstance(entity, dict):
++        return ""
++    for urls in (entity.get("urls"), entity_values(entity).get("stream_url")):
++        medium = urls.get("medium") if isinstance(urls, dict) else None
++        if isinstance(medium, dict) and isinstance(medium.get("message"), str):
++            return medium["message"]
++    return ""
++
++
++def song_row_from_entity(entity, require_artwork: bool = True) -> dict | None:
++    """A song row from any list/search entity, or None when it lacks seokey, title or
++    (unless `require_artwork=False`) artwork; the caller then falls back to songDetail."""
++    if not isinstance(entity, dict):
++        return None
++    values = entity_values(entity)
++    sources = (entity, values)
++    seokey = _text(_first(sources, "seokey", "seo"))
++    title = _text(_first(sources, "track_title", "title", "name", "ti"))
++    images = _images(sources)
++    if not seokey or not title:
++        return None
++    if require_artwork and not any(images["urls"].values()):
++        return None
++    if _text(_first(sources, "entity_type", "ty")).upper() in ("AL", "ALBUM", "PL", "PLAYLIST", "AR", "ARTIST"):
++        return None
++    names, artist_seokeys, artist_ids = _artist_fields(sources)
++    album, album_seokey, album_id = _album_fields(entity, values)
++    return {
++        "seokey": seokey,
++        "album_seokey": album_seokey,
++        "track_id": _text(_first(sources, "track_id", "entity_id", "id", "iid")),
++        "title": title,
++        "artists": names,
++        "artist_seokeys": artist_seokeys,
++        "artist_ids": artist_ids,
++        "artist_image": "",
++        "album": album,
++        "album_id": album_id,
++        "duration": _text(_first(sources, "duration")),
++        "popularity": _text(_first(sources, "popularity")),
++        "genres": "",
++        "is_explicit": _is_explicit(sources),
++        "language": _language(sources),
++        "label": "",
++        "release_date": _text(_first(sources, "release_date")),
++        "play_count": _text(_first(sources, "play_ct")),
++        "favorite_count": _text(_first(sources, "total_favourite_count", "favorite_count")),
++        "song_url": f"https://gaana.com/song/{seokey}",
++        "album_url": f"https://gaana.com/album/{album_seokey}" if album_seokey else "",
++        "images": images,
++        "stream_urls": {"urls": {}},
++        "lite": True,
++    }
++
++
++def album_row_from_entity(entity, require_artwork: bool = True) -> dict | None:
++    """An album row (format_json_albums(info=False) keys) from a list/search entity."""
++    if not isinstance(entity, dict):
++        return None
++    values = entity_values(entity)
++    sources = (entity, values)
++    seokey = _text(_first(sources, "seokey", "seo"))
++    title = _text(_first(sources, "title", "name", "ti"))
++    images = _images(sources)
++    if not seokey or not title:
++        return None
++    if require_artwork and not any(images["urls"].values()):
++        return None
++    names, artist_seokeys, artist_ids = _artist_fields(sources)
++    return {
++        "seokey": seokey,
++        "album_id": _text(_first(sources, "album_id", "entity_id", "id", "iid")),
++        "title": title,
++        "artists": names,
++        "artist_seokeys": artist_seokeys,
++        "artist_ids": artist_ids,
++        "duration": _text(_first(sources, "duration")),
++        "is_explicit": _is_explicit(sources),
++        "language": _language(sources),
++        "label": _text(_first(sources, "recordlevel")),
++        "track_count": _text(_first(sources, "trackcount", "track_count")),
++        "release_date": _text(_first(sources, "release_date")),
++        "play_count": _text(_first(sources, "al_play_ct", "play_ct")),
++        "favorite_count": _text(_first(sources, "favorite_count")),
++        "album_url": f"https://gaana.com/album/{seokey}",
++        "images": images,
++        "lite": True,
++    }
++
++
++def artist_row_from_entity(entity) -> dict | None:
++    """An artist row (format_json_artists(info=False) keys) from a search entity."""
++    if not isinstance(entity, dict):
++        return None
++    values = entity_values(entity)
++    sources = (entity, values)
++    seokey = _text(_first(sources, "seokey", "seo"))
++    name = _text(_first(sources, "name", "ti", "title"))
++    if not seokey or not name:
++        return None
++    return {
++        "seokey": seokey,
++        "artist_id": _text(_first(sources, "artist_id", "entity_id", "id", "iid")),
++        "name": name,
++        "song_count": _text(_first(sources, "songs", "song_count")),
++        "album_count": _text(_first(sources, "albums", "album_count")),
++        "favorite_count": _text(_first(sources, "favorite_count")),
++        "artist_url": f"https://gaana.com/artist/{seokey}",
++        "images": {"urls": artwork_urls(_first(sources, "atw", "aw", "artwork"))},
++        "lite": True,
++    }
++
++
++def search_items(result) -> list:
++    """The hits (`gd`) of a Gaana search response: the first result group that has any."""
++    if not isinstance(result, dict):
++        return []
++    groups = result.get("gr")
++    if not isinstance(groups, list):
++        return []
++    for group in groups:
++        items = group.get("gd") if isinstance(group, dict) else None
++        if isinstance(items, list) and items:
++            return [item for item in items if isinstance(item, dict)]
++    return []
++
++
++def page_slice(rows: list, limit: int, page: int) -> list:
++    offset = (max(1, page) - 1) * limit
++    return rows[offset:offset + limit]
+diff --git a/api/errors.py b/api/errors.py
+index 064b433..83bd3c6 100644
+--- a/api/errors.py
++++ b/api/errors.py
+@@ -2,4 +2,32 @@ class Errors:
+     async def invalid_seokey(self) -> dict:
+         return {"error": "Invalid Seokey!"}
+     async def no_results(self) -> dict:
+-        return {"error": "Unable to find any results!"}
+\ No newline at end of file
++        return {"error": "Unable to find any results!"}
++
++
++class UpstreamError(Exception):
++    """Gaana could not be reached or refused the request (see app.py for the HTTP mapping)."""
++
++
++class BlockedError(UpstreamError):
++    """Gaana refused the request (401/403/429), or GaanaPy's circuit breaker is open.
++
++    Answered as 503 {"error": "blocked", "upstream_status", "retry_after"} by app.py.
++    """
++
++    def __init__(self, status: int, retry_after: int):
++        super().__init__(f"Gaana refused the request (HTTP {status}); retry in {retry_after} s")
++        self.status = status
++        self.retry_after = retry_after
++
++
++class UpstreamUnavailable(UpstreamError):
++    """Network error, timeout or 5xx from Gaana. Answered as 502 by app.py."""
++
++
++def most_severe(failures: list) -> Exception:
++    """The failure to report when every request of a fan-out failed: a block wins."""
++    for failure in failures:
++        if isinstance(failure, BlockedError):
++            return failure
++    return failures[0]
+diff --git a/api/functions.py b/api/functions.py
+index 7406d5f..aec1c5c 100644
+--- a/api/functions.py
++++ b/api/functions.py
+@@ -67,7 +67,7 @@ class Functions:
+         try:
+             ids = []
+             for i in results:
+-                ids.append(i['artist_id'])
++                ids.append(str(i['artist_id']))  # Gaana may send numeric ids
+             return ', '.join(ids)
+         except (KeyError, TypeError):
+             return ""
+diff --git a/api/gaanapy.py b/api/gaanapy.py
+index 102bce1..9399047 100644
+--- a/api/gaanapy.py
++++ b/api/gaanapy.py
+@@ -1,4 +1,5 @@
+ import asyncio
++import json
+ import os
+ import aiohttp
+ from api.songs.songs import Songs
+@@ -10,9 +11,15 @@ from api.charts.charts import Charts
+ from api.playlists.playlists import Playlists
+ from api import endpoints
+ from api.functions import Functions
+-from api.errors import Errors
++from api.errors import Errors, UpstreamError, BlockedError, UpstreamUnavailable
+ from api.discovery.discovery import Discovery
+ from api.songcache import SongCache
++from api.upstream import (
++    BLOCK_STATUSES, DEFAULT_HEADERS, CircuitBreaker, Pacer, ResponseCache, parse_retry_after,
++)
++
++__all__ = ["GaanaPy", "UpstreamError", "BlockedError", "UpstreamUnavailable"]
++
+ 
+ class GaanaPy(Songs, Albums, Artists, Trending, NewReleases, Charts, Playlists, Discovery):
+     def __init__(self):
+@@ -22,40 +29,63 @@ class GaanaPy(Songs, Albums, Artists, Trending, NewReleases, Charts, Playlists,
+         self.api_endpoints = endpoints
+         self.functions = Functions()
+         self.errors = Errors()
+-        # Every list endpoint fans out into one Gaana request per item (a trending list
+-        # of 20 songs is 21 requests). Firing them all at once is what gets clients
+-        # rate-limited and blocked, so cap how many are in flight together.
++        # Bursts are what get clients rate-limited and blocked, so cap how many requests
++        # are in flight together and space their starts out (see api/upstream.py).
+         self._gate = asyncio.Semaphore(max(1, int(os.getenv("GAANA_MAX_CONCURRENT", "4"))))
+-        # ...and remember song details, so a song already listed costs nothing next time.
++        self._pacer = Pacer()
++        # After a block, stop asking Gaana for a while instead of hammering it.
++        self.breaker = CircuitBreaker()
++        # Remember list/search responses, and song details, so repeats cost nothing.
++        self.list_cache = ResponseCache()
+         self.song_cache = SongCache()
+ 
+-    async def _safe_request(self, method: str, url: str, **kwargs) -> dict:
++    async def _safe_request(self, method: str, url: str, cache: bool = True, **kwargs) -> dict:
++        """One request to Gaana, paced, behind the circuit breaker.
++
++        `cache=False` for responses that must not be reused (song details carry stream
++        links; they have their own cache). Raises BlockedError / UpstreamUnavailable.
++        """
++        key = self.list_cache.key(method, url, kwargs) if cache and self.list_cache.enabled else None
++        if key is not None:
++            hit = self.list_cache.get(key)
++            if hit is not None:
++                return hit
++        self.breaker.check()
+         async with self._gate:
+-            return await self._request_now(method, url, **kwargs)
++            # The breaker may have opened while this request waited for a slot.
++            self.breaker.check()
++            await self._pacer.wait()
++            # ...or while it slept in the pacer: a request queued behind one that got a
++            # 403 must not go out once its turn comes.
++            self.breaker.check()
++            result = await self._request_now(method, url, **kwargs)
++        # "No results" is not remembered (it may be a hiccup); payloads are, even the
++        # playlist ones that carry "error": "SUCCESS".
++        if key is not None and isinstance(result, dict) and set(result) != {"error"}:
++            self.list_cache.put(key, result)
++        return result
+ 
+     async def _request_now(self, method: str, url: str, **kwargs) -> dict:
++        headers = {**DEFAULT_HEADERS, **(kwargs.pop("headers", None) or {})}
+         try:
+-            if method == "GET":
+-                response = await self.aiohttp.get(url, **kwargs)
+-            else:
+-                response = await self.aiohttp.post(url, **kwargs)
++            async with self.aiohttp.request(method, url, headers=headers, **kwargs) as response:
++                status = response.status
++                if status in BLOCK_STATUSES:
++                    retry_after = self.breaker.trip(status, parse_retry_after(response.headers.get("Retry-After")))
++                    raise BlockedError(status, retry_after)
++                if status >= 500:
++                    raise UpstreamUnavailable(f"Gaana returned HTTP {status}")
++                self.breaker.success()
++                if status != 200:
++                    return await self.errors.no_results()
++                body = await response.read()
+         except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
+             # Network failures are outages, not "no results".
+-            raise UpstreamError(f"Gaana unreachable: {type(exc).__name__}") from exc
+-        # Blocked / rate-limited / server errors are outages too; surfacing them lets
+-        # clients show "provider unavailable" instead of a misleading empty result.
+-        if response.status in (401, 403, 429) or response.status >= 500:
+-            raise UpstreamError(f"Gaana returned HTTP {response.status}")
++            raise UpstreamUnavailable(f"Gaana unreachable: {type(exc).__name__}") from exc
+         try:
+-            if response.status != 200:
+-                return await self.errors.no_results()
+-            result = await response.json()
+-            if not isinstance(result, dict):
+-                return await self.errors.no_results()
+-            return result
+-        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError, TypeError):
++            result = json.loads(body)
++        except (ValueError, TypeError):
+             return await self.errors.no_results()
+-
+-
+-class UpstreamError(Exception):
+-    """Gaana could not be reached or refused the request (handled as HTTP 502 by app.py)."""
++        if not isinstance(result, dict):
++            return await self.errors.no_results()
++        return result
+diff --git a/api/newreleases/newreleases.py b/api/newreleases/newreleases.py
+index 07da297..6744cc5 100644
+--- a/api/newreleases/newreleases.py
++++ b/api/newreleases/newreleases.py
+@@ -1,26 +1,74 @@
++import asyncio
++
++from api.entities import album_row_from_entity
++from api.errors import UpstreamError, most_severe
++
++
+ class NewReleases:
+     async def get_new_releases(self, language: str, limit: int) -> dict:
++        """{"tracks": [...], "albums": [...]}, up to `limit` of EACH type.
++
++        Rows come from the new-releases payload itself; details are only looked up for
++        entries that lack title or artwork. One failed type leaves the other intact.
++        """
+         endpoints = self.api_endpoints
+         errors = self.errors
+         result = await self._safe_request("POST", endpoints.new_releases_url + language)
+         if isinstance(result, dict) and "error" in result:
+             return result
+-        track_seokeys = []
+-        album_seokeys = []
+-        entities_list = result.get('entities', [])
+-        for i in range(min(limit, len(entities_list))):
+-            entity = entities_list[i]
+-            if not isinstance(entity, dict):
++        track_entities = []
++        album_entities = []
++        for entity in result.get('entities') or []:
++            if not isinstance(entity, dict) or not entity.get('seokey'):
+                 continue
+             etype = entity.get('entity_type')
+-            seo = entity.get('seokey')
+-            if etype == "AL" and seo:
+-                album_seokeys.append(seo)
+-            elif etype == "TR" and seo:
+-                track_seokeys.append(seo)
+-        if len(track_seokeys) == 0 and len(album_seokeys) == 0:
++            if etype == "AL":
++                album_entities.append(entity)
++            elif etype == "TR":
++                track_entities.append(entity)
++        if len(track_entities) == 0 and len(album_entities) == 0:
+             return await errors.no_results()
++        tracks, albums = await asyncio.gather(
++            self.songs_from_entities(track_entities, limit),
++            self._albums_from_entities(album_entities, limit),
++            return_exceptions=True,
++        )
++        failures = [part for part in (tracks, albums) if isinstance(part, BaseException)]
++        for failure in failures:
++            # Only provider failures are tolerated; a bug must surface as one.
++            if not isinstance(failure, UpstreamError):
++                raise failure
++        usable = [part for part in (tracks, albums) if isinstance(part, list) and part]
++        if failures and not usable:
++            raise most_severe(failures)
+         data = {}
+-        data['tracks'] = await self.get_track_info(track_seokeys)
+-        data['albums'] = await self.get_album_info(album_seokeys, False)
++        data['tracks'] = tracks if isinstance(tracks, list) else []
++        data['albums'] = albums if isinstance(albums, list) else []
++        if not data['tracks'] and not data['albums']:
++            return await errors.no_results()
+         return data
++
++    async def _albums_from_entities(self, entities: list, limit: int) -> list:
++        """Album rows for the first `limit` album entities; albumDetail only for the
++        entries that lack title or artwork."""
++        rows = []
++        for entity in entities[:limit]:
++            rows.append(album_row_from_entity(entity) or entity['seokey'])
++        pending = [row for row in rows if isinstance(row, str)]
++        details = {}
++        if pending:
++            try:
++                found = await self.get_album_info(pending, False)
++            except UpstreamError:
++                if not any(isinstance(row, dict) for row in rows):
++                    raise
++                found = []
++            if isinstance(found, list):
++                for album in found:
++                    details.setdefault(album.get('seokey'), album)
++        out = []
++        for row in rows:
++            row = details.get(row) if isinstance(row, str) else row
++            if row is not None:
++                out.append(row)
++        return out
+diff --git a/api/playlists/playlists.py b/api/playlists/playlists.py
+index 00dea2b..2e6940e 100644
+--- a/api/playlists/playlists.py
++++ b/api/playlists/playlists.py
+@@ -1,22 +1,24 @@
++DEFAULT_PLAYLIST_LIMIT = 50
++
++
+ class Playlists:
+-    async def get_playlist_info(self, playlist_id: str) -> dict:
++    async def get_playlist_info(self, playlist_id: str, limit: int = DEFAULT_PLAYLIST_LIMIT) -> list:
++        """The playlist's first `limit` tracks, built from the playlist payload itself
++        (songDetail only for entries that lack title or artwork)."""
+         endpoints = self.api_endpoints
+         errors = self.errors
+         result = await self._safe_request("POST", endpoints.playlist_details_url + playlist_id)
+         # Gaana now includes "error": "SUCCESS" in successful playlist payloads,
+         # so only treat the response as an error when it carries no tracks.
+-        if isinstance(result, dict) and "error" in result and not result.get("tracks"):
++        if not isinstance(result, dict) or not isinstance(result.get("tracks"), list) or not result["tracks"]:
+             return await errors.no_results()
+-        track_count = result.get('count')
+-        if not track_count:
++        tracks = result["tracks"]
++        try:
++            count = int(result.get('count'))
++        except (TypeError, ValueError):
++            count = len(tracks)
++        entities = [track for track in tracks[:max(0, count)] if isinstance(track, dict)]
++        track_data = await self.songs_from_entities(entities, limit)
++        if len(track_data) == 0:
+             return await errors.no_results()
+-        track_ids = []
+-        tracks = result.get('tracks', [])
+-        for i in range(min(int(track_count), len(tracks))):
+-            seo = tracks[i].get('seokey') if isinstance(tracks[i], dict) else None
+-            if seo:
+-                track_ids.append(seo)
+-        if len(track_ids) == 0:
+-            return await errors.no_results()
+-        track_data = await self.get_track_info(track_ids)
+         return track_data
+diff --git a/api/songs/songs.py b/api/songs/songs.py
+index 005635f..d89aaac 100644
+--- a/api/songs/songs.py
++++ b/api/songs/songs.py
+@@ -1,57 +1,122 @@
+ import asyncio
+ 
++from api.entities import encrypted_stream, page_slice, search_items, song_row_from_entity
++from api.errors import UpstreamError, most_severe
++
++
+ class Songs:
+-    async def search_songs(self, search_query: str, limit: int) -> list:
++    async def search_songs(self, search_query: str, limit: int, page: int = 1) -> list:
++        """Rows built straight from the search hits: one Gaana request, no detail lookups."""
+         endpoints = self.api_endpoints
+         errors = self.errors
+-        result = await self._safe_request("POST", endpoints.search_songs_url + search_query)
++        result = await self._safe_request(
++            "POST", endpoints.search_url, params=endpoints.search_params("track", search_query)
++        )
+         if isinstance(result, dict) and "error" in result:
+             return result
+-        track_ids = []
+-        gd = (result.get('gr') or [{}])[0].get('gd', [])
+-        for i in range(min(limit, len(gd))):
+-            seo = gd[i].get('seo') if isinstance(gd[i], dict) else None
+-            if seo:
+-                track_ids.append(seo)
+-        if len(track_ids) == 0:
++        rows = _unique(song_row_from_entity(item, require_artwork=False) for item in search_items(result))
++        rows = page_slice(rows, limit, page)
++        if len(rows) == 0:
+             return await errors.no_results()
+-        track_info = await self.get_track_info(track_ids)
+-        return track_info
++        return rows
++
++    async def songs_from_entities(self, entities: list, limit: int) -> list:
++        """Song rows for the first `limit` entities of a list payload, in order.
++
++        Entities that carry seokey + title + artwork become rows directly; only the others
++        are looked up with songDetail (at most `limit`). A failed lookup drops that row
++        only; the block/outage is raised when nothing at all could be built.
++        """
++        rows = []
++        for entity in entities if isinstance(entities, list) else []:
++            if len(rows) >= limit:
++                break
++            row = song_row_from_entity(entity)
++            if row is not None:
++                message = encrypted_stream(entity)
++                if message:
++                    row["stream_urls"] = await self._stream_urls(message)
++                rows.append(row)
++                continue
++            seokey = entity.get("seokey") or entity.get("seo") if isinstance(entity, dict) else None
++            if isinstance(seokey, str) and seokey:
++                rows.append(seokey)
++        pending = [row for row in rows if isinstance(row, str)]
++        details = {}
++        if pending:
++            details, failures = await self._track_details(pending)
++            if failures and not details and not any(isinstance(row, dict) for row in rows):
++                # Nothing could be built at all: report the outage instead of "no results".
++                raise most_severe(failures)
++        out = []
++        for row in rows:
++            if isinstance(row, str):
++                versions = details.get(row) or []
++                # songDetail can return several versions; take the one asked for.
++                row = next((t for t in versions if t.get("seokey") == row), versions[0] if versions else None)
++            if row is not None:
++                out.append(row)
++        return _unique(out)[:limit]
+ 
+     async def get_track_info(self, track_id: list, fresh: bool = False) -> list:
+         """Song details for each seokey, in order.
+ 
+-        Local fix: every list (trending, new releases, search, albums, artists) is built
+-        from one songDetail request per song, which is what gets clients blocked. Details
+-        are remembered (see SongCache), so the same song showing up in several lists or
+-        in the next hourly refresh costs no new request. `fresh=True` bypasses the
+-        cache (direct song lookups, used to renew stream links).
++        Local fix: details are remembered (see SongCache), so the same song showing up in
++        several lists costs no new request. `fresh=True` bypasses the cache (direct song
++        lookups, used to renew stream links). One failed lookup only drops that song; when
++        every lookup failed, the most severe failure (a block first) is raised.
+         """
++        details, failures = await self._track_details(track_id, fresh)
++        track_info = []
++        for seokey in track_id:
++            track_info.extend(details.get(seokey) or [])
++        if len(track_info) == 0:
++            if failures:
++                raise most_severe(failures)
++            return await self.errors.no_results()
++        return track_info
++
++    async def _track_details(self, track_id: list, fresh: bool = False) -> tuple[dict, list]:
++        """({seokey: [formatted song, ...]}, [provider failures]) for the given seokeys."""
+         endpoints = self.api_endpoints
+-        errors = self.errors
+         cache = getattr(self, "song_cache", None)
+         known = {} if fresh or cache is None else cache.get_many(track_id)
+         missing = list(dict.fromkeys(i for i in track_id if i not in known))
+         results = await asyncio.gather(*[
+-            self._safe_request("POST", endpoints.song_details_url + i)
++            self._safe_request("POST", endpoints.song_details_url + i, cache=False)
+             for i in missing
+-        ])
+-        fetched = {}
++        ], return_exceptions=True)
++        details = dict(known)
++        failures = []
+         for seokey, result in zip(missing, results):
++            if isinstance(result, BaseException):
++                # Only provider failures are tolerated; a bug must surface as one.
++                if not isinstance(result, UpstreamError):
++                    raise result
++                failures.append(result)
++                continue
+             if isinstance(result, dict) and "error" in result:
+                 continue
+             tracks = result.get('tracks')
+-            if not tracks:
++            if not isinstance(tracks, list) or not tracks:
++                continue
++            formatted = await asyncio.gather(*[self.format_json_songs(t) for t in tracks if isinstance(t, dict)])
++            formatted = [t for t in formatted if "error" not in t]
++            if not formatted:
+                 continue
+-            fetched[seokey] = await asyncio.gather(*[self.format_json_songs(t) for t in tracks])
++            details[seokey] = formatted
+             if cache is not None:
+-                cache.put(seokey, fetched[seokey])
+-        track_info = []
+-        for seokey in track_id:
+-            track_info.extend(known.get(seokey) or fetched.get(seokey) or [])
+-        if len(track_info) == 0:
+-            return await errors.no_results()
+-        return track_info
++                cache.put(seokey, formatted)
++        return details, failures
++
++    async def _stream_urls(self, message: str) -> dict:
++        base_url = await self.functions.decryptLink(message)
++        return {'urls': {
++            'very_high_quality': base_url.replace("64.mp4", "320.mp4") if base_url else "",
++            'high_quality': base_url.replace("64.mp4", "128.mp4") if base_url else "",
++            'medium_quality': base_url or "",
++            'low_quality': base_url.replace("64.mp4", "16.mp4") if base_url else "",
++        }}
+ 
+     async def format_json_songs(self, results: dict) -> dict:
+         functions = self.functions
+@@ -105,28 +170,28 @@ class Songs:
+         data['images']['urls']['large_artwork'] = results.get('artwork_large', '')
+         data['images']['urls']['medium_artwork'] = results.get('artwork_web', '')
+         data['images']['urls']['small_artwork'] = results.get('artwork', '')
+-        data['stream_urls'] = {'urls': {}}
+-
+-        try:
+-            medium = results.get('urls', {}).get('medium', {})
+-            if medium.get('message'):
+-                base_url = await functions.decryptLink(medium['message'])
+-                data['stream_urls']['urls']['very_high_quality'] = (
+-                    base_url.replace("64.mp4", "320.mp4") if base_url else ""
+-                )
+-                data['stream_urls']['urls']['high_quality'] = (
+-                    base_url.replace("64.mp4", "128.mp4") if base_url else ""
+-                )
+-                data['stream_urls']['urls']['medium_quality'] = base_url
+-                data['stream_urls']['urls']['low_quality'] = (
+-                    base_url.replace("64.mp4", "16.mp4") if base_url else ""
+-                )
+-            else:
+-                raise KeyError
+-        except (KeyError, AttributeError):
+-            data['stream_urls']['urls']['very_high_quality'] = ""
+-            data['stream_urls']['urls']['high_quality'] = ""
+-            data['stream_urls']['urls']['medium_quality'] = ""
+-            data['stream_urls']['urls']['low_quality'] = ""
++        medium = results.get('urls') if isinstance(results.get('urls'), dict) else {}
++        medium = medium.get('medium') if isinstance(medium.get('medium'), dict) else {}
++        if medium.get('message'):
++            data['stream_urls'] = await self._stream_urls(medium['message'])
++        else:
++            data['stream_urls'] = {'urls': {
++                'very_high_quality': "",
++                'high_quality': "",
++                'medium_quality': "",
++                'low_quality': "",
++            }}
+ 
+         return data
++
++
++def _unique(rows) -> list:
++    """Rows without Nones and repeated seokeys, first occurrence kept."""
++    seen = set()
++    out = []
++    for row in rows:
++        if not row or row.get("seokey") in seen:
++            continue
++        seen.add(row.get("seokey"))
++        out.append(row)
++    return out
+diff --git a/api/trending/trending.py b/api/trending/trending.py
+index db9500b..582ceab 100644
+--- a/api/trending/trending.py
++++ b/api/trending/trending.py
+@@ -1,18 +1,15 @@
+ class Trending:
+-    async def get_trending(self, language: str, limit: int) -> dict:
++    async def get_trending(self, language: str, limit: int) -> list:
++        """Trending songs, built from the trending payload itself (songDetail only for
++        entries that lack title or artwork)."""
+         endpoints = self.api_endpoints
+         errors = self.errors
+         headers = {'Cookie': f'__ul={language};'}
+         result = await self._safe_request("POST", endpoints.trending_url, headers=headers)
+         if isinstance(result, dict) and "error" in result:
+             return result
+-        track_seokeys = []
+-        entities_list = result.get('entities', [])
+-        for i in range(min(limit, len(entities_list))):
+-            seo = entities_list[i].get('seokey') if isinstance(entities_list[i], dict) else None
+-            if seo:
+-                track_seokeys.append(seo)
+-        if len(track_seokeys) == 0:
++        entities = [entity for entity in result.get('entities') or [] if isinstance(entity, dict)]
++        tracks = await self.songs_from_entities(entities, limit)
++        if len(tracks) == 0:
+             return await errors.no_results()
+-        track_data = await self.get_track_info(track_seokeys)
+-        return track_data
++        return tracks
+diff --git a/api/upstream.py b/api/upstream.py
+new file mode 100644
+index 0000000..0fbf75d
+--- /dev/null
++++ b/api/upstream.py
+@@ -0,0 +1,140 @@
++"""Local fix: how GaanaPy talks to Gaana without getting blocked.
++
++* Requests identify honestly (aiohttp's own User-Agent) and only ask for JSON.
++* Pacing: at most GAANA_MAX_CONCURRENT (default 4) requests in flight, and at least
++  GAANA_MIN_INTERVAL_MS (default 200) between request starts.
++* Circuit breaker: after a 401/403/429 no request is sent for GAANA_BLOCK_COOLDOWN_SECONDS
++  (default 120), doubling for every repeated block up to 900 s; callers get a BlockedError
++  right away instead.
++* List/search responses are remembered for GAANA_LIST_CACHE_SECONDS (default 600).
++"""
++
++import asyncio
++import copy
++import json
++import math
++import os
++import time
++from collections import OrderedDict
++
++from api.errors import BlockedError
++
++DEFAULT_HEADERS = {
++    "Accept": "application/json, text/plain, */*",
++}
++
++BLOCK_STATUSES = (401, 403, 429)
++MAX_BLOCK_COOLDOWN_SECONDS = 900.0
++
++
++def _env_float(name: str, default: str) -> float:
++    try:
++        return float(os.getenv(name, default))
++    except ValueError:
++        return float(default)
++
++
++class CircuitBreaker:
++    def __init__(self, cooldown: float | None = None, max_cooldown: float = MAX_BLOCK_COOLDOWN_SECONDS,
++                 clock=time.monotonic):
++        self.base = _env_float("GAANA_BLOCK_COOLDOWN_SECONDS", "120") if cooldown is None else cooldown
++        self.max_cooldown = max(max_cooldown, self.base)
++        self._clock = clock
++        self._open_until = 0.0
++        self._cooldown = 0.0
++        self._status = 403
++
++    def remaining(self) -> float:
++        return max(0.0, self._open_until - self._clock())
++
++    def check(self) -> None:
++        """Raise BlockedError while the breaker is open (no Gaana call is made)."""
++        remaining = self.remaining()
++        if remaining > 0:
++            raise BlockedError(self._status, math.ceil(remaining))
++
++    def trip(self, status: int, retry_after: float | None = None) -> int:
++        """Record a block; returns the seconds until Gaana may be asked again."""
++        self._status = status
++        if self.remaining() > 0:
++            # Requests that were already in flight when the first block arrived are
++            # the same block, not a repeat: don't double the cooldown for them.
++            return math.ceil(self.remaining())
++        self._cooldown = self.base if self._cooldown <= 0 else min(self._cooldown * 2, self.max_cooldown)
++        cooldown = max(self._cooldown, retry_after or 0)
++        self._open_until = self._clock() + cooldown
++        return math.ceil(cooldown)
++
++    def success(self) -> None:
++        self._cooldown = 0.0
++
++
++class Pacer:
++    """Spaces request starts at least `interval` seconds apart (process-wide)."""
++
++    def __init__(self, interval_ms: float | None = None, clock=time.monotonic):
++        ms = _env_float("GAANA_MIN_INTERVAL_MS", "200") if interval_ms is None else interval_ms
++        self.interval = max(0.0, ms / 1000.0)
++        self._clock = clock
++        self._next_start = 0.0
++
++    async def wait(self) -> None:
++        if self.interval <= 0:
++            return
++        now = self._clock()
++        start = max(now, self._next_start)
++        # Reserve the slot before sleeping, so concurrent callers queue up behind it.
++        self._next_start = start + self.interval
++        if start > now:
++            await asyncio.sleep(start - now)
++
++
++class ResponseCache:
++    """In-process TTL cache for list/search JSON responses (song details have their own)."""
++
++    def __init__(self, ttl: float | None = None, max_items: int = 1000, clock=time.monotonic):
++        self.ttl = _env_float("GAANA_LIST_CACHE_SECONDS", "600") if ttl is None else ttl
++        self.max_items = max_items
++        self._clock = clock
++        self._data: OrderedDict[str, tuple[float, dict]] = OrderedDict()
++
++    @property
++    def enabled(self) -> bool:
++        return self.ttl > 0 and self.max_items > 0
++
++    @staticmethod
++    def key(method: str, url: str, kwargs: dict) -> str:
++        headers = kwargs.get("headers") or {}
++        cookie = next((v for k, v in headers.items() if k.lower() == "cookie"), "")
++        params = kwargs.get("params")
++        if isinstance(params, dict):
++            params = sorted((str(k), str(v)) for k, v in params.items())
++        return json.dumps([method.upper(), url, params, cookie, kwargs.get("data"), kwargs.get("json")],
++                          ensure_ascii=False, default=str)
++
++    def get(self, key: str):
++        item = self._data.get(key)
++        if item is None:
++            return None
++        expires, value = item
++        if expires <= self._clock():
++            self._data.pop(key, None)
++            return None
++        self._data.move_to_end(key)
++        return copy.deepcopy(value)
++
++    def put(self, key: str, value: dict) -> None:
++        if not self.enabled:
++            return
++        self._data[key] = (self._clock() + self.ttl, copy.deepcopy(value))
++        self._data.move_to_end(key)
++        while len(self._data) > self.max_items:
++            self._data.popitem(last=False)
++
++
++def parse_retry_after(value) -> float | None:
++    try:
++        seconds = float(value)
++    except (TypeError, ValueError):
++        return None
++    return seconds if seconds > 0 else None
+diff --git a/app.py b/app.py
+index 0b2a1df..ce560c5 100644
+--- a/app.py
++++ b/app.py
+@@ -3,8 +3,10 @@ from fastapi.openapi.utils import get_openapi
+ from fastapi.responses import JSONResponse
+ from fastapi.middleware.cors import CORSMiddleware
+ from api.gaanapy import GaanaPy
++from api.errors import BlockedError, UpstreamError
+ from typing import Optional
+ import re
++import unicodedata
+ 
+ app = FastAPI()
+ 
+@@ -21,12 +23,33 @@ async def health():
+     return {"status": "ok"}
+ 
+ 
++# Callers must be able to tell a Gaana block (back off) from an outage (retry later) and
++# from a bug in GaanaPy (don't blame Gaana), so each gets its own status and body.
++@app.exception_handler(BlockedError)
++async def blocked_handler(request: Request, exc: BlockedError):
++    return JSONResponse(
++        status_code=503,
++        content={"error": "blocked", "upstream_status": exc.status, "retry_after": exc.retry_after},
++        headers={"Retry-After": str(exc.retry_after)},
++    )
++
++
++@app.exception_handler(UpstreamError)
++async def upstream_unavailable_handler(request: Request, exc: UpstreamError):
++    return JSONResponse(
++        status_code=502,
++        content={"error": "upstream_unavailable", "detail": str(exc)[:200]},
++    )
++
++
+ @app.exception_handler(Exception)
+ async def unhandled_exception_handler(request: Request, exc: Exception):
+     return JSONResponse(
+-        status_code=502,
+-        content={"error": f"Upstream data source error: {type(exc).__name__}"}
++        status_code=500,
++        content={"error": "internal", "detail": type(exc).__name__},
+     )
++
++
+ gaanapy = None
+ 
+ # Constants
+@@ -36,17 +59,44 @@ DEFAULT_LIMIT = 10
+ MIN_PAGE = 1
+ DEFAULT_PAGE = 1
+ MAX_PAGE = 1000
++MAX_SEARCH_PAGE = 20        # search pages are sliced from Gaana's first result page
++DEFAULT_PLAYLIST_LIMIT = 50
+ 
+ MAX_QUERY_LENGTH = 200
+ MAX_SEOKEY_LENGTH = 200
+ MAX_ARTIST_ID_LENGTH = 20   
+ MAX_LANGUAGE_LENGTH = 50
+ 
+-SEO_KEY_BASE_PATTERN = r"^[a-z0-9\-]+$"                        # only lowercase, digits, hyphens
++SEO_KEY_BASE_PATTERN = r"^[A-Za-z0-9\-]+$"                     # letters, digits, hyphens (Gaana seokeys
++                                                                  # can be mixed case: tum-hi-ho-MWQM71XEWq)
+ ARTIST_ID_PATTERN = r"^[0-9]+$"                                 # only digits
+ LANGUAGE_PATTERN = r"^[a-zA-Z]+(?:\s[a-zA-Z]+)*$"                # letters and single internal spaces,
+                                                                   # no leading/trailing/blank-only input
+-SEARCH_QUERY_PATTERN = r"^[a-zA-Z0-9\s\-'.&]+$"
++
++
++def clean_search_query(value: str) -> str:
++    """Any language or script is allowed: drop control characters, collapse whitespace."""
++    value = unicodedata.normalize("NFC", value)
++    value = "".join(" " if unicodedata.category(ch) in ("Cc", "Cs") else ch for ch in value)
++    return " ".join(value.split())
++
++
++def search_query(
++    query: str = Query(..., min_length=1, max_length=MAX_QUERY_LENGTH,
++                       description="Text to search for, in any language or script."),
++) -> str:
++    cleaned = clean_search_query(query)
++    if not cleaned:
++        raise HTTPException(status_code=422, detail="query must contain at least one visible character")
++    return cleaned
++
++
++def search_page(
++    page: Optional[int] = Query(DEFAULT_PAGE, ge=MIN_PAGE, le=MAX_SEARCH_PAGE,
++                                description="Page of results (1-based)."),
++) -> int:
++    return page
++
+ 
+ # Custom validator for seokey
+ def validate_seokey(
+@@ -78,12 +128,11 @@ async def home():
+ 
+ @app.get("/songs/search/", summary="Search for songs.")
+ async def songs_search(
+-    query: str = Query(..., min_length=1, max_length=MAX_QUERY_LENGTH,
+-                       pattern=SEARCH_QUERY_PATTERN,
+-                       description="Name of the song to search for."),
+-    limit: Optional[int] = Query(DEFAULT_LIMIT, ge=MIN_LIMIT, le=MAX_LIMIT, description="Number of results")
++    query: str = Depends(search_query),
++    limit: Optional[int] = Query(DEFAULT_LIMIT, ge=MIN_LIMIT, le=MAX_LIMIT, description="Number of results"),
++    page: int = Depends(search_page),
+ ):
+-    result = await gaanapy.search_songs(query, limit)
++    result = await gaanapy.search_songs(query, limit, page)
+     if isinstance(result, dict) and "error" in result:
+         raise HTTPException(status_code=404, detail=result["error"])
+     return result
+@@ -100,12 +149,11 @@ async def songs_info(
+ 
+ @app.get("/albums/search/", summary="Search for albums.")
+ async def albums_search(
+-    query: str = Query(..., min_length=1, max_length=MAX_QUERY_LENGTH,
+-                       pattern=SEARCH_QUERY_PATTERN,
+-                       description="Name of the album to search for."),
+-    limit: Optional[int] = Query(DEFAULT_LIMIT, ge=MIN_LIMIT, le=MAX_LIMIT)
++    query: str = Depends(search_query),
++    limit: Optional[int] = Query(DEFAULT_LIMIT, ge=MIN_LIMIT, le=MAX_LIMIT, description="Number of results"),
++    page: int = Depends(search_page),
+ ):
+-    result = await gaanapy.search_albums(query, limit)
++    result = await gaanapy.search_albums(query, limit, page)
+     if isinstance(result, dict) and "error" in result:
+         raise HTTPException(status_code=404, detail=result["error"])
+     return result
+@@ -121,12 +169,11 @@ async def albums_info(
+ 
+ @app.get("/artists/search/", summary="Search for artists.")
+ async def artists_search(
+-    query: str = Query(..., min_length=1, max_length=MAX_QUERY_LENGTH,
+-                       pattern=SEARCH_QUERY_PATTERN,
+-                       description="Name of the artist to search for."),
+-    limit: Optional[int] = Query(DEFAULT_LIMIT, ge=MIN_LIMIT, le=MAX_LIMIT)
++    query: str = Depends(search_query),
++    limit: Optional[int] = Query(DEFAULT_LIMIT, ge=MIN_LIMIT, le=MAX_LIMIT, description="Number of results"),
++    page: int = Depends(search_page),
+ ):
+-    result = await gaanapy.search_artists(query, limit)
++    result = await gaanapy.search_artists(query, limit, page)
+     if isinstance(result, dict) and "error" in result:
+         raise HTTPException(status_code=404, detail=result["error"])
+     return result
+@@ -193,7 +240,7 @@ async def get_trending(
+         raise HTTPException(status_code=404, detail=result["error"])
+     return result
+ 
+-@app.get("/newreleases", summary="Retrieve newly released songs and albums across languages.")
++@app.get("/newreleases", summary="Retrieve newly released songs and albums (up to `limit` of each).")
+ async def get_new_releases(
+     language: str = Query(..., min_length=1, max_length=MAX_LANGUAGE_LENGTH,
+                           pattern=LANGUAGE_PATTERN,
+@@ -216,9 +263,11 @@ async def get_charts(
+ 
+ @app.get("/playlists/info/", summary="Retrieve detailed information on a playlist.")
+ async def playlists_info(
+-    seokey: str = Depends(validate_seokey)
++    seokey: str = Depends(validate_seokey),
++    limit: Optional[int] = Query(DEFAULT_PLAYLIST_LIMIT, ge=MIN_LIMIT, le=MAX_LIMIT,
++                                 description="Number of tracks")
+ ):
+-    playlist_info = await gaanapy.get_playlist_info(seokey)
++    playlist_info = await gaanapy.get_playlist_info(seokey, limit)
+     if isinstance(playlist_info, dict) and "error" in playlist_info:
+         raise HTTPException(status_code=404, detail=playlist_info["error"])
+     return playlist_info
+diff --git a/tests/conftest.py b/tests/conftest.py
+new file mode 100644
+index 0000000..faef5b7
+--- /dev/null
++++ b/tests/conftest.py
+@@ -0,0 +1,10 @@
++import pytest
++
++
++@pytest.fixture(autouse=True)
++def _no_request_pacing(monkeypatch):
++    """Tests never talk to Gaana, so don't make them wait out the request spacing.
++
++    Tests of the pacing itself set GAANA_MIN_INTERVAL_MS again.
++    """
++    monkeypatch.setenv("GAANA_MIN_INTERVAL_MS", "0")
+diff --git a/tests/fixtures/charts_top.json b/tests/fixtures/charts_top.json
+new file mode 100644
+index 0000000..ae0d87a
+--- /dev/null
++++ b/tests/fixtures/charts_top.json
+@@ -0,0 +1 @@
++{"count":"129","status":1,"eof":0,"entities":[{"language":"Hindi","seokey":"gaana-dj-hindi-top-50-1","name":"Hindi Top 50","artwork":"https://a10.gaanacdn.com/images/playlists/27/1038627/crop_175x175_1793105696_1038627.jpg","atw":"https://a10.gaanacdn.com/gn_pl_img/playlists/P7m3GNKqxo/7m3GQwOybq/size_m_1793105696.jpg","entity_id":"1038627","entity_type":"PL","artwork_medium":"https://a10.gaanacdn.com/images/playlists/27/1038627/crop_480x480_1793105696_1038627.jpg","favorite_count":2542038,"premium_content":"0","user_favorite":0,"entity_info":[{"key":"track_id","value":"80692668,82180665,82522148,69704746,81677582,78591314,80524747,77604460,81368495,79858206,69812535,69850067,80692353,69850069,81658723,82437240,80798147,73161322,79126658,72932872,77888088,78777653,74464911,77187382,69850064,69942120,78467571,76622418,77352637,80797705,82590566,78843439,79994632,69898980,77604464,79993233,82456140,80895318,81511545,82031384,82050931,69850066,80909779,73161320,79858197,81809141,69942122,73216318,79858177,81658609,75248539,80026261,71474253,78276624,77910578,73818059,82153102,77927823,77604459,82087797,75725112,80190013,71474242,77604465,80197489,77604458,73218335,73216539,81426996,80994642,82432996,78843441,80563395,70362016,73218334,69850068,72368069,80870735,82050933,78081008,69850070,73371653,75294946,81155535,71495539,70390357,73380734,75143194,73380729,71495530,80909780,72794099,69942123,80667338,82658000,70690868,80925600,71533185,69555589,77604468"},{"key":"modified_on","value":"1794508200000"},{"key":"created_by","value":"Gaana"},{"key":"created_by_user_id","value":"0"},{"key":"detailed_description","value":"<p>Tune in to the top chart songs in Hindi right now.<br />Enjoy the 50 biggest tracks that are ruling the charts.<br />Hit play and stay updated with the highest-ranking music.</p>"},{"key":"lpid","value":""},{"key":"parental_warning","value":1},{"key":"is_sponsored","value":0},{"key":"is_collaborative","value":0},{"key":"pl_play_ct","value":"1B+"}]},{"language":"Punjabi","seokey":"gaana-dj-punjabi-all-time-top-50","name":"Punjabi All Time Top 50","artwork":"https://a10.gaanacdn.com/images/playlists/68/63635468/crop_175x175_1792405145_63635468.jpg","atw":"https://a10.gaanacdn.com/gn_pl_img/playlists/zLp36PvbrG/p36EzPv0Kr/size_m_1792405145.jpg","entity_id":"63635468","entity_type":"PL","artwork_medium":"https://a10.gaanacdn.com/images/playlists/68/63635468/crop_480x480_1792405145_63635468.jpg","favorite_count":30821,"premium_content":"0","user_favorite":0,"entity_info":[{"key":"track_id","value":"80726822,80198802,76846262,63840862,76335477,78510173,66762822,63840865,73859947,72779481,67885712,61484991,77315227,76335494,80726826,66762820,31171538,61539255,67600717,67873953,80726824,37359442,65377912,49783372,64874657,28216928,31171524,81859322,57435615,65440695,58886512,2713015,66456445,23992604,62967042,67885710,63903514,16767623,72013174,75485001,25582511,77438189,75105494,54200144,28146663,23979852,53401849,77315222,75105498,53401855,66262889,38671296,16767625,22907163,61667379,51670086,80810259,21045326,23736390,55304782,45408170"},{"key":"modified_on","value":"1794508200000"},{"key":"created_by","value":"Gaana"},{"key":"created_by_user_id","value":"0"},{"key":"detailed_description","value":"<p class=\"p1\">Turn up the volume with Punjabi All Time Top 50 on Gaana, the ultimate destination for fans of Punjabi music, Punjabi party songs and the biggest Punjabi chartbusters of all time. Punjabi All Time Top 50 is a showcase of viral hits, global anthems and unforgettable Punjabi bangers. This playlist brings together the most-streamed and loved <a href=\"https://gaana.com/playlist/gaana-dj-punjabi-top-50-1\"><strong>Punjabi songs</strong></a> dominating playlists, reels and dance floors across the world. Gaana's Punjabi All Time Top 50 playlist features powerhouse artistes like <a href=\"https://gaana.com/artist/karan-aujla\"><strong>Karan Aujla</strong></a>, <a href=\"https://gaana.com/artist/diljit-dosanjh\"><strong>Diljit Dosanjh</strong></a>, Yo Yo Honey Singh and AP Dhillon. It is a nonstop ride through the biggest Punjabi hits of the streaming era. From the swagger-filled vibe of Boyfriend and For A Reason to the addictive energy of Dealer, 5-7 and Wavy, every song delivers high-octane beats, catchy hooks and signature Punjabi attitude. If you are searching for the best Punjabi songs, Punjabi all time top 50 songs, trending Punjabi music, Punjabi party hits, Punjabi dance songs, romantic Punjabi songs or viral Punjabi playlist songs, this collection has something for every mood. It has commercial chartbusters with fan-favourite anthems that continue to dominate clubs, weddings, road trips and gym playlists.The playlist also reflects how Punjabi music has become a global cultural force, with artistes like Karan Aujla and Diljit Dosanjh taking Punjabi pop and hip-hop to international audiences. Stream Punjabi All Time Top 50 now on Gaana and discover the latest Punjabi songs, trending Punjabi albums, viral songs and timeless hits all in one place. If you love Punjabi pop, desi hip-hop or upbeat dance music, Gaana is your go-to platform for the hottest Punjabi songs anytime, anywhere.</p>"},{"key":"lpid","value":""},{"key":"parental_warning","value":1},{"key":"is_sponsored","value":0},{"key":"is_collaborative","value":0},{"key":"pl_play_ct","value":"20M+"}]},{"language":"English","seokey":"gaana-dj-all-time-top-50","name":"All Time Top 100","artwork":"https://a10.gaanacdn.com/images/playlists/66/63626166/crop_175x175_63626166.jpg","atw":"https://a10.gaanacdn.com/gn_pl_img/playlists/XYybzNrb2g/ybzpmXQE32/size_m_1789971837.jpg","entity_id":"63626166","entity_type":"PL","artwork_medium":"https://a10.gaanacdn.com/images/playlists/66/63626166/crop_480x480_63626166.jpg","favorite_count":27586,"premium_content":"0","user_favorite":0,"entity_info":[{"key":"track_id","value":"41627779,624943,32506675,21100412,37240919,838763,19398795,17637647,20980268,50279862,24676850,27290114,28883310,21342457,16865825,28419018,21160773,22869703,3320663,21531879,15661942,503924,16115410,1814113,20817733,25658817,3150576,1253520,22402649,494736,22926167,23930345,1626360,494735,29026111,25204567,17399784,16433549,15524452,31584482,20921004,758567,290388,27824601,23052638,1018385,21572414,21791823,3367164,1111190,27019951,755049,23551964,21310901,24147184,26905323,22939028,203439,631641,2570391,2300445,20774921,21232014,42077633,23600562,28372651,1195930,31597771,23963574,22836436,17445429,624626,16819088,20980271,722856,2202017,27967112,25867811,2295279,27931938,18585032,16115409,466353,1288154,28294018,2472731,53046019,2679341,13737416,28242463,1523327,39074400,3183803,1079146,1162253,17710543,27824603,1317639,1230322,494734,29831621,2300267,25830996,21823935,23323705,974406,23540406,23963568,1508961,23794644,986681,833352,24458011,631632,755043,17497147,15661949,28026884"},{"key":"modified_on","value":"1789583400000"},{"key":"created_by","value":"Gaana"},{"key":"created_by_user_id","value":"0"},{"key":"detailed_description","value":"<p class=\"p1\">Step into the world of timeless music with All Time Top 100 on Gaana. This is the ultimate playlist featuring the best <a href=\"https://gaana.com/playlist/gaana-dj-gaana-international-top-50\"><strong>English songs</strong></a> that have defined generations. Gaana's All Time Top 100 playlist has legendary pop anthems to modern global chartbusters and it brings together iconic hits that continue to dominate playlists across the world. Relive the magic of Michael Jackson songs like They Don&rsquo;t Care About Us and Billie Jean, experience the disco energy of Boney M.&rsquo;s Rasputin, groove to Dua Lipa&rsquo;s viral hit Levitating, and sing along to Ed Sheeran&rsquo;s global sensation Shape of You. The playlist also features fan-favourite Taylor Swift songs and unforgettable classics from some of the biggest names in international music. All Time Top 100 is perfect for those who are searching for the top 100 songs, trending English songs, classic English hits, best pop songs, party anthems or evergreen international songs, this playlist has something for every mood. It is perfect for long drives, workouts, house parties or relaxing evenings, All Time Top 100 is a non-stop musical experience packed with nostalgia and chart-topping energy. Stream the best English songs anytime on Gaana and discover why these songs remain some of the most loved songs in music history.</p>"},{"key":"lpid","value":""},{"key":"parental_warning","value":1},{"key":"is_sponsored","value":0},{"key":"is_collaborative","value":0},{"key":"pl_play_ct","value":"11M+"}]},{"language":"Hindi","seokey":"gaana-dj-2010s-top-50","name":"2010s Top 50","artwork":"https://a10.gaanacdn.com/images/playlists/24/63489124/crop_175x175_1794683519_63489124.jpg","atw":"https://a10.gaanacdn.com/gn_pl_img/playlists/zLp36v3rGe/p36EX7r0Kr/size_m_1794683519.jpg","entity_id":"63489124","entity_type":"PL","artwork_medium":"https://a10.gaanacdn.com/images/playlists/24/63489124/crop_480x480_1794683519_63489124.jpg","favorite_count":11989,"premium_content":"0","user_favorite":0,"entity_info":[{"key":"track_id","value":"21565035,22331510,582161,26974811,17545457,20573167,2596984,1820776,1559,1532221,51305376,20609351,16663500,23591462,15630948,22774250,1796792,1560,944306,2723500,41698129,1542003,2470379,24725285,1226774,28075647,20731435,41797150,23591812,1888265,19551276,24643688,22825334,2416815,17478124,21262810,21546455,6410794,1046979,24126370,23945281,587439,22160163,23070820,27136612,1225211,16775232,24225706,618309,1553,17212837,14931941,289669,2593969,14931942,1595,19502871,458347,20644753,19454196,19559812,23046587,1470416,1806526,2334560,506593,26321133,17465216,21262809,28097308,21044908,1477770,41697491,15198427,14027344"},{"key":"modified_on","value":"1794681000000"},{"key":"created_by","value":"Gaana"},{"key":"created_by_user_id","value":"0"},{"key":"detailed_description","value":""},{"key":"lpid","value":""},{"key":"parental_warning","value":0},{"key":"is_sponsored","value":0},{"key":"is_collaborative","value":0},{"key":"pl_play_ct","value":"5M+"}]},{"language":"Punjabi","seokey":"gaana-dj-punjabi-top-50-1","name":"Punjabi Top 50","artwork":"https://a10.gaanacdn.com/images/playlists/49/1001849/crop_175x175_1793105667_1001849.jpg","atw":"https://a10.gaanacdn.com/gn_pl_img/playlists/w4MKPgOboj/4MKP2xArWo/size_m_1793105667.jpg","entity_id":"1001849","entity_type":"PL","artwork_medium":"https://a10.gaanacdn.com/images/playlists/49/1001849/crop_480x480_1793105667_1001849.jpg","favorite_count":822615,"premium_content":"0","user_favorite":0,"entity_info":[{"key":"track_id","value":"80198802,80726822,80726826,80726824,81859322,78510173,76846262,80810259,76335477,73859947,80726823,72779481,77315227,80726825,76335494,81363254,78457944,81578932,81642600,75105494,81170891,72013174,81759169,69776036,77438189,81914141,75485001,77315222,80231295,75105498,81867269,79972076,80366402,80854926,81604345,71620642,80241293,73914727,81993558,82294098,81384825,74526331,81363265,80279244,75105496,75036205,82535497,80878362,78510170,77315219,79928769,81470010,81804883,82526884,82169488,70904101,81865049,80814849,80791569,81408361,78441708,81765232,75204432,69968969,81846377,74492727,76721023,71403592,75105497,80865642,76335478,81102180,79692138,71081413,79928762,80878371,68866741,82562793,72645181,81458554,81216818,71565399,80859784,80678852,81643500,73914726,75279562,82665273,80036903,80392325,77446804,81703564,81246064,77990975,81517850,77509775,82111977,80399689,75105491,80710000"},{"key":"modified_on","value":"1794508200000"},{"key":"created_by","value":"Gaana"},{"key":"created_by_user_id","value":"0"},{"key":"detailed_description","value":""},{"key":"lpid","value":""},{"key":"parental_warning","value":1},{"key":"is_sponsored","value":0},{"key":"is_collaborative","value":0},{"key":"pl_play_ct","value":"1B+"}]}],"user_token_status":"0","hv":"4e2363d24673a343c399013c9f4a1534@3b5ddd75b90e51e8d968c6b3cf4b3758"}
+\ No newline at end of file
+diff --git a/tests/fixtures/search_tracks_malare.json b/tests/fixtures/search_tracks_malare.json
+new file mode 100644
+index 0000000..cfb2676
+--- /dev/null
++++ b/tests/fixtures/search_tracks_malare.json
+@@ -0,0 +1 @@
++{"topFacet":"Track","gr":[{"ty":"Track","topSc":1685,"va":"1","gd":[{"iid":"712492","id":712492,"ti":"Malare","aw":"https://a10.gaanacdn.com/gn_img/albums/R7vKX6WmrP/7vKXx7gKmr/size_m.jpg","sti":"S. Janaki,Vidyasagar,S. P. Balasubrahmanyam","lang":["Tamil"],"seo":"malare","ty":"Track","language":"Tamil","scoreF":15947.44,"hf":1,"boostValue":105.52056813316452,"isPc":"0","alist":"[S. Janaki,Vidyasagar,S. P. Balasubrahmanyam]","isrc":"INM129400624","cat":"Love Story","pw":0,"tags":["Happy","Romance"],"langBoostValue":53.65807208320251},{"iid":"80308685","id":80308685,"ti":"Malare Mounama","aw":"https://a10.gaanacdn.com/gn_img/albums/w4MKPObojg/MKPkVOerbo/size_m.jpg","sti":"Vidyasagar,Vairamuthu,S. P. Balasubrahmanyam","lang":["Tamil"],"seo":"malare-mounama-A3mn711GWN","ty":"Track","language":"Tamil","scoreF":24016.521,"boostValue":48.40719559481953,"isPc":"0","alist":"[Vidyasagar,Vairamuthu,S. P. Balasubrahmanyam]","isrc":"IND292510478","pw":0,"langBoostValue":24.025731864075713},{"iid":"13820833","id":13820833,"ti":"Malare","aw":"https://a10.gaanacdn.com/gn_img/albums/oAJbDElKnL/AJbD75njWn/size_m.jpg","sti":"Vijay Yesudas","lang":["Malayalam"],"seo":"malare-7","ty":"Track","language":"Malayalam","scoreF":791.8968,"boostValue":92.67919128156306,"isPc":"0","alist":"[Vijay Yesudas]","isrc":"INM811456901","cat":"Love Story","pw":0,"tags":["Romance"],"langBoostValue":49.994034265130296},{"iid":"71462098","id":71462098,"ti":"Malare Malare Unekendru","aw":"https://a10.gaanacdn.com/gn_img/albums/d41WjznWPL/1Wj1Gwrz3P/size_m_1774958738.jpg","sti":"T. Rajendran,P. Susheela","lang":["Tamil"],"seo":"malare-malare-unekendru-2098-7146","ty":"Track","language":"Tamil","scoreF":20453.148,"boostValue":40.74090891626035,"isPc":"0","alist":"[T. Rajendran,P. Susheela]","isrc":"INK120905073","pw":0,"langBoostValue":20.04820427324912},{"iid":"36198899","id":36198899,"ti":"Gulmuhar Malare","aw":"https://a10.gaanacdn.com/gn_img/albums/10q3Zj1352/q3ZR1Dy035/size_m_1620285957.jpg","sti":"Hariharan,Timmi,Anupama Deshapande","lang":["Tamil"],"seo":"gulmuhar-malare-12","ty":"Track","language":"Tamil","scoreF":604.94275,"boostValue":87.08188855854792,"isPc":"0","alist":"[Hariharan,Timmi,Anupama Deshapande]","isrc":"INH100109240","isDolby":true,"pw":0,"langBoostValue":44.091464438387426},{"iid":"82706","id":82706,"ti":"Malare Kurinji Malare","aw":"https://a10.gaanacdn.com/gn_img/albums/ZaP37RKDy7/aP37N69KDy/size_m.jpg","sti":"K J Yesudas,S. Janaki","lang":["Tamil"],"seo":"malare-kurinji-malare-1","ty":"Track","language":"Tamil","scoreF":571.1844,"boostValue":64.44424259409068,"isPc":"0","alist":"[K J Yesudas,S. Janaki]","isrc":"INH100072550","cat":"Love Story","pw":0,"tags":["Old","Romance"],"langBoostValue":32.34629168521878},{"iid":"74266147","id":74266147,"ti":"Mala Re (ORIGINAL)","aw":"https://a10.gaanacdn.com/gn_img/albums/DwPKOxB3qV/PKORQR9Ybq/size_m.jpg","sti":"Jeet Gannguli","lang":["Bengali"],"seo":"mala-re-original","ty":"Track","language":"Bengali","scoreF":15682.109,"boostValue":74.67671264036427,"isPc":"0","alist":"[Jeet Gannguli]","isrc":"INS2X1100040","pw":0,"langBoostValue":35.489835031962976},{"iid":"34055724","id":34055724,"ti":"Malare Oru Varthai","aw":"https://a10.gaanacdn.com/gn_img/albums/qa4WEqqWP1/4WEkvzgeKP/size_m.jpg","sti":"Hariharan,Sujatha Mohan","lang":["Tamil"],"seo":"malare-oru-varthai","ty":"Track","language":"Tamil","scoreF":422.30048,"boostValue":60.60110209101956,"isPc":"0","alist":"[Hariharan,Sujatha Mohan]","isrc":"INS289900183","pw":0,"tags":["Folk"],"langBoostValue":30.352341024706632},{"iid":"78253143","id":78253143,"ti":"Muthu Malare","aw":"https://a10.gaanacdn.com/gn_img/albums/YoEWlabzXB/EWlA6jLabz/size_m.jpg","sti":"Harikrishnan","lang":["Malayalam"],"seo":"muthu-malare","ty":"Track","language":"Malayalam","scoreF":9100.404,"boostValue":40,"isPc":"0","alist":"[Harikrishnan]","isrc":"INM2W2500531","pw":0,"langBoostValue":20.91842366707142},{"iid":"13992444","id":13992444,"ti":"Malare Unplugged","aw":"https://a10.gaanacdn.com/gn_img/albums/ZaP374RWDy/aP37XB2xWD/size_m.jpg","sti":"Vijay Yesudas","lang":["Malayalam"],"seo":"malare-unplugged","ty":"Track","language":"Malayalam","scoreF":376.09503,"boostValue":52.537755298765255,"isPc":"0","alist":"[Vijay Yesudas]","isrc":"INM811456919","cat":"Love Story","pw":0,"tags":["Romance"],"langBoostValue":27.8384784737638},{"iid":"39928582","id":39928582,"ti":"Velli Malare","aw":"https://a10.gaanacdn.com/gn_img/albums/10q3Zj1352/q3ZRa4w235/size_m_1729427734.jpg","sti":"Mahalakshmi Iyer,S. P. Balasubrahmanyam,A. R. Rahman","lang":["Tamil"],"seo":"velli-malare","ty":"Track","language":"Tamil","scoreF":8695.768,"boostValue":75.8176691174119,"isPc":"0","alist":"[Mahalakshmi Iyer,S. P. Balasubrahmanyam,A. R. Rahman]","isrc":"INN139900549","pw":0,"langBoostValue":38.24720821698241},{"iid":"62017691","id":62017691,"ti":"Malare Malare (From \"Un Kannil Neer Vazhinthaal\")","aw":"https://a10.gaanacdn.com/gn_img/albums/dwN398KDPa/N394DQMNKD/size_m.jpg","sti":"Ilaiyaraaja,S. Janaki","lang":["Tamil"],"seo":"malare-malare-11","ty":"Track","language":"Tamil","scoreF":8032.898,"boostValue":32.6238511806426,"isPc":"0","alist":"[Ilaiyaraaja,S. Janaki]","isrc":"INS172100587","pw":0,"langBoostValue":15.836801484197677},{"iid":"66798607","id":66798607,"ti":"Malare Manmiziyale","aw":"https://a10.gaanacdn.com/gn_img/albums/ZaP37RKDy7/P37l592lWD/size_m.jpg","sti":"Yuvan Shankar Raja,V. Devanand,Joffy Tharakan","lang":["Malayalam"],"seo":"malare-manmiziyale","ty":"Track","language":"Malayalam","scoreF":7899.8013,"boostValue":45.54509540972721,"isPc":"0","alist":"[Yuvan Shankar Raja,V. Devanand,Joffy Tharakan]","isrc":"INA980700005","pw":0,"langBoostValue":23.978968655330174},{"iid":"77207576","id":77207576,"ti":"SEVVAMBAL MALARE","aw":"https://a10.gaanacdn.com/gn_img/albums/qa4WEqqWP1/4WEmXjL5WP/size_m.jpg","sti":"Nincy","lang":["Telugu"],"seo":"sevvambal-malare","ty":"Track","language":"Telugu","scoreF":7885.19,"boostValue":35.0665272051583,"isPc":"0","alist":"[Nincy]","isrc":"INS2Y2607010","pw":0,"langBoostValue":16.38576828130538},{"iid":"74828384","id":74828384,"ti":"Vaadinen Malare","aw":"https://a10.gaanacdn.com/gn_img/albums/koMWQ4B3qL/MWQVvnDAbq/size_m.jpg","sti":"Sean Roldan","lang":["Tamil"],"seo":"vaadinen-malare","ty":"Track","language":"Tamil","scoreF":7569.4,"boostValue":33.68517774455003,"isPc":"0","alist":"[Sean Roldan]","isrc":"INS172604682","pw":0,"langBoostValue":16.387453431851213},{"iid":"77620295","id":77620295,"ti":"Lilly Malarey (From \"Varavu\")","aw":"https://a10.gaanacdn.com/gn_img/albums/Dk9KN2KBx1/9KNndRl6KB/size_m.jpg","sti":"Sam C.S,M G Sreekumar,B. K. Harinarayanan","lang":["Malayalam"],"seo":"lilly-malarey-from-varavu-4W8P9k84Wx","ty":"Track","language":"Malayalam","scoreF":7020.88,"boostValue":66.91651324188808,"isPc":"0","alist":"[Sam C.S,M G Sreekumar,B. K. Harinarayanan]","isrc":"INSM32600083","pw":0,"langBoostValue":35.7746513091335},{"iid":"51261547","id":51261547,"ti":"Malare Mounama","aw":"https://a10.gaanacdn.com/gn_img/albums/a7LWBaz3zX/LWBkVRxzbz/size_m.jpg","sti":"Sreejit Somanathan","lang":["Tamil"],"seo":"malare-mounama-5","ty":"Track","language":"Tamil","scoreF":6976.95,"boostValue":40.134599649763814,"isPc":"0","alist":"[Sreejit Somanathan]","isrc":"TCAGZ2313156","pw":0,"langBoostValue":19.733630616251848},{"iid":"21882501","id":21882501,"ti":"Malare Kurinji Malare","aw":"https://a10.gaanacdn.com/gn_img/albums/w4MKPObojg/4MKPMEzA3o/size_m.jpg","sti":"Soolamangalam Sisters","lang":["Tamil"],"seo":"malare-kurinji-malare-2","ty":"Track","language":"Tamil","scoreF":6865.0894,"boostValue":39.14310134442846,"isPc":"0","alist":"[Soolamangalam Sisters]","isrc":"INH100117990","pw":0,"langBoostValue":19.219207919699315},{"iid":"27450928","id":27450928,"ti":"Malare Thendral Paadum","aw":"https://a10.gaanacdn.com/gn_img/albums/DwPKOBbqVZ/wPKO9dGaWq/size_m.jpg","sti":"Arun Mozhi,S. Janaki","lang":["Tamil"],"seo":"malare-thendral-paadum","ty":"Track","language":"Tamil","scoreF":6821.198,"boostValue":39.33619933580469,"isPc":"0","alist":"[Arun Mozhi,S. Janaki]","isrc":"INM6E9402059","pw":0,"langBoostValue":19.319393657675985},{"iid":"22206481","id":22206481,"ti":"Malare Kurunji Malare","aw":"https://a10.gaanacdn.com/gn_img/albums/zLp36v3rGe/Lp3648DEbr/size_m.jpg","sti":"K J Yesudas,S. Janaki","lang":["Tamil"],"seo":"malare-kurunji-malare-4","ty":"Track","language":"Tamil","scoreF":6517.88,"boostValue":36.96097555462828,"isPc":"0","alist":"[K J Yesudas,S. Janaki]","isrc":"INH100504890","cat":"Love Story","pw":0,"tags":["Romance"],"langBoostValue":18.087047605389785},{"iid":"52387","id":52387,"ti":"Malarendra Mugamondru","aw":"https://a10.gaanacdn.com/gn_img/albums/6Zxb27K9wN/Zxb2LBq39w/size_m.jpg","sti":"L.R. Eswari,M.S. Raju","lang":["Tamil"],"seo":"malarendra-mugamondru","ty":"Track","language":"Tamil","scoreF":6478.9863,"boostValue":65.08142551570161,"isPc":"0","alist":"[L.R. Eswari,M.S. Raju]","isrc":"INH100301790","pw":0,"tags":["Party","Happy","Old","Retro"],"langBoostValue":32.676883633756155},{"iid":"24021023","id":24021023,"ti":"Malare Enna Kolam","aw":"https://a10.gaanacdn.com/gn_img/albums/dwN39y83DP/wN39oDdbDP/size_m_1532892713.jpg","sti":"S. P. Balasubrahmanyam","lang":["Tamil"],"seo":"malare-enna-kolam","ty":"Track","language":"Tamil","scoreF":6478.3677,"boostValue":37.55308790793307,"isPc":"0","alist":"[S. P. Balasubrahmanyam]","isrc":"INH101300106","pw":0,"tags":["Old","Sad"],"langBoostValue":18.394255425927707},{"iid":"82698302","id":82698302,"ti":"Mälarens Lucia","aw":"https://a10.gaanacdn.com/gn_img/albums/w4MKPDOKoj/MKPk7x8rbo/size_m.jpg","sti":"Jens Hult","lang":["Swedish"],"seo":"mlarens-lucia","ty":"Track","language":"Swedish","scoreF":6203.986,"boostValue":20.542999483776516,"isPc":"0","alist":"[Jens Hult]","isrc":"SEUM72601578","pw":0,"langBoostValue":12.6764722549842},{"iid":"23373727","id":23373727,"ti":"Malare Mounamay","aw":"https://a10.gaanacdn.com/gn_img/albums/DwPKOxB3qV/wPKO2LZVbq/size_m_1785009979.jpg","sti":"Shameer Madathara","lang":["Malayalam"],"seo":"malare-mounamay","ty":"Track","language":"Malayalam","scoreF":6020.602,"boostValue":34.89956379453393,"isPc":"0","alist":"[Shameer Madathara]","isrc":"INM251619884","pw":0,"langBoostValue":18.10330267939835},{"iid":"21350066","id":21350066,"ti":"The Romance Of Power Paandi - Venpani Malare (Male)","aw":"https://a10.gaanacdn.com/gn_img/albums/Bp1bAnK029/p1bAZ6Q4K0/size_m_1779449720.jpg","sti":"Sean Roldan,Dhanush","lang":["Tamil"],"seo":"the-romance-of-power-paandi-venpani-malare-male","ty":"Track","language":"Tamil","scoreF":5311.2935,"boostValue":67.35438605775954,"isPc":"0","alist":"[Sean Roldan,Dhanush]","isrc":"IND291701351","pw":0,"tags":["Party","Happy"],"langBoostValue":33.85617207520989},{"iid":"52481741","id":52481741,"ti":"Malare Pesu","aw":"https://a10.gaanacdn.com/gn_img/albums/Rz4W8vKxD5/4W87NQ4J3x/size_m_1765353821.jpg","sti":"Ilaiyaraaja,K. S. Chithra","lang":["Tamil"],"seo":"malare-pesu-1","ty":"Track","language":"Tamil","scoreF":5117.891,"boostValue":29.513640835585257,"isPc":"0","alist":"[Ilaiyaraaja,K. S. Chithra]","isrc":"INS172004418","pw":0,"langBoostValue":14.223119661505269},{"iid":"82939001","id":82939001,"ti":"MANADHAI MAYAKKUM MALARE","aw":"https://a10.gaanacdn.com/gn_img/albums/d41WjnWPLq/1Wj02aaNKP/size_m.jpg","sti":"Hari Raveendran,Jim Jacob","lang":["Tamil"],"seo":"manadhai-mayakkum-malare","ty":"Track","language":"Tamil","scoreF":4970.4834,"boostValue":21.9147880295777,"isPc":"0","alist":"[Hari Raveendran,Jim Jacob]","isrc":"INP2X2501472","pw":0,"langBoostValue":10.280579033712616},{"iid":"23404228","id":23404228,"ti":"Malare Malare","aw":"https://a10.gaanacdn.com/gn_img/albums/mGjKr1b6zX/GjKrvQzVK6/size_m_1779777435.jpg","sti":"Dhivya","lang":["Malayalam"],"seo":"malare-malare-4","ty":"Track","language":"Malayalam","scoreF":4940.958,"boostValue":20.050968375888424,"isPc":"0","alist":"[Dhivya]","isrc":"INM251303400","pw":0,"langBoostValue":9.907809016386148},{"iid":"77667836","id":77667836,"ti":"Malare Malare","aw":"https://a10.gaanacdn.com/gn_img/albums/lJvKa63DV9/vKaXZ0mAbD/size_m_1784028022.jpg","sti":"Afsal Thuvoor","lang":["Malayalam"],"seo":"malare-malare-w3v8QEqjbj","ty":"Track","language":"Malayalam","scoreF":4743.311,"boostValue":6.7254550566359494,"isPc":"0","alist":"[Afsal Thuvoor]","isrc":"AEA0E5010041","pw":0,"langBoostValue":2.5529611748735785},{"iid":"63798388","id":63798388,"ti":"Malare Thendral (From \"Veetla Visheshanga\")","aw":"https://a10.gaanacdn.com/gn_img/albums/NOXWVRgWkq/XWVyyk9w3k/size_m.jpg","sti":"Arunmozhi","lang":["Tamil"],"seo":"malare-thendral-from-veetla-visheshanga","ty":"Track","language":"Tamil","scoreF":4544.4185,"boostValue":26.24878561610265,"isPc":"0","alist":"[Arunmozhi]","isrc":"FR2X41784308","pw":0,"langBoostValue":12.52920287231641},{"iid":"25041927","id":25041927,"ti":"Malare Malare","aw":"https://a10.gaanacdn.com/gn_img/albums/6Zxb2r7b9w/Zxb2EdpgW9/size_m.jpg","sti":"Vinod VenugopalAcharya","lang":["Tamil"],"seo":"malare-malare-5","ty":"Track","language":"Tamil","scoreF":4501.275,"boostValue":18.13428515351551,"isPc":"0","alist":"[Vinod VenugopalAcharya]","isrc":"INT131810954","pw":0,"langBoostValue":8.319126882595988},{"iid":"21350067","id":21350067,"ti":"The Romance Of Power Paandi - Venpani Malare (Female)","aw":"https://a10.gaanacdn.com/gn_img/albums/Bp1bAnK029/p1bAZ6Q4K0/size_m_1779449720.jpg","sti":"Shweta Mohan,Dhanush,Sean Roldan","lang":["Tamil"],"seo":"the-romance-of-power-paandi-venpani-malare-female","ty":"Track","language":"Tamil","scoreF":4382.084,"boostValue":54.832050630258806,"isPc":"0","alist":"[Shweta Mohan,Dhanush,Sean Roldan]","isrc":"IND291701352","pw":0,"langBoostValue":27.359162929469132},{"iid":"1618915","id":1618915,"ti":"Malare Malare Theriyatha","aw":"https://a10.gaanacdn.com/gn_img/albums/4Z9bqgo3yQ/Z9bqgXy53y/size_m.jpg","sti":"P. Susheela","lang":["Tamil"],"seo":"malare-malare-theriyatha-1","ty":"Track","language":"Tamil","scoreF":4371.5737,"boostValue":34.68476077230972,"isPc":"0","alist":"[P. Susheela]","isrc":"INH100109930","pw":0,"tags":["Happy","Old"],"langBoostValue":16.90607075454484},{"iid":"66565587","id":66565587,"ti":"Malare Kurinji Malare - Drill","aw":"https://a10.gaanacdn.com/gn_img/albums/Dk9KNk23Bx/9KNoL2r93B/size_m.jpg","sti":"Heart Killer Beats,K J Yesudas,S. Janaki","lang":["Tamil"],"seo":"malare-kurinji-malare-drill","ty":"Track","language":"Tamil","scoreF":4276.0615,"boostValue":24.178077660446654,"isPc":"0","alist":"[Heart Killer Beats,K J Yesudas,S. Janaki]","isrc":"INH102504943","pw":0,"langBoostValue":11.454849880899994},{"iid":"23232280","id":23232280,"ti":"Kanne Thaai Malare","aw":"https://a10.gaanacdn.com/gn_img/song/g4w3vwrWjJ/w3vBeGBp3j/size_m_1521813099.jpg","sti":"Shaan Rahman,Vineeth Sreenivasan","lang":["Malayalam"],"seo":"kanne-thaai-malare","ty":"Track","language":"Malayalam","scoreF":4271.5166,"boostValue":53.66422894360013,"isPc":"0","alist":"[Shaan Rahman,Vineeth Sreenivasan]","isrc":"INM811458827","pw":0,"langBoostValue":28.460221295728072},{"iid":"41558930","id":41558930,"ti":"Putham Pudhu Malare","aw":"https://a10.gaanacdn.com/gn_img/albums/9En3peWXDV/n3pqeyGGWX/size_m_1787054970.jpg","sti":"Bala Bharathi,S. P. Balasubrahmanyam,Vairamuthu","lang":["Tamil"],"seo":"putham-pudhu-malare","ty":"Track","language":"Tamil","scoreF":4076.6975,"boostValue":50.91812397308926,"isPc":"0","alist":"[Bala Bharathi,S. P. Balasubrahmanyam,Vairamuthu]","isrc":"IND292201133","pw":0,"langBoostValue":25.328486029412296},{"iid":"78252","id":78252,"ti":"Virinja Malare","aw":"https://a10.gaanacdn.com/gn_img/albums/4Z9bqZoKyQ/Z9bqay1byQ/size_m.jpg","sti":"K. P. Udayabhanu,P Leela","lang":["Hindi"],"seo":"virinja-malare","ty":"Track","language":"Hindi","scoreF":4009.2976,"boostValue":25.29736429169282,"isPc":"0","alist":"[K. P. Udayabhanu,P Leela]","isrc":"INH100324150","pw":0,"tags":["Old"],"langBoostValue":10.67674519799918}],"stxt":"Songs"}],"srId":"a921b566-c171-433c-b95b-ca47639a74b4","algo":"NEWSEARCH","action":0,"q":"malare","originalQuery":"Malare","abFlag":26}
+\ No newline at end of file
+diff --git a/tests/fixtures/search_tracks_tum_hi_ho.json b/tests/fixtures/search_tracks_tum_hi_ho.json
+new file mode 100644
+index 0000000..3acf47d
+--- /dev/null
++++ b/tests/fixtures/search_tracks_tum_hi_ho.json
+@@ -0,0 +1 @@
++{"topFacet":"Track","gr":[{"ty":"Track","topSc":2620,"va":"1","gd":[{"iid":"944286","id":944286,"ti":"Tum Hi Ho","aw":"https://a10.gaanacdn.com/gn_img/albums/d41WjnWPLq/41Wjz1LOWP/size_m_1712905431.jpg","sti":"Mithoon,Arijit Singh","lang":["Hindi"],"seo":"tumhiho","ty":"Track","language":"Hindi","scoreF":1699923,"hf":1,"boostValue":141.45525958613135,"isPc":"0","alist":"[Mithoon,Arijit Singh]","isrc":"INS181303031","cat":"Love Story","isDolby":true,"pw":0,"tags":["Happy","Chill","Romance","Bollywood"],"langBoostValue":64.13920908829168},{"iid":"76622418","id":76622418,"ti":"Bandhu 2.0 (From \"Cocktail 2\")","aw":"https://a10.gaanacdn.com/gn_img/albums/Dk9KNk23Bx/9KNn6n96KB/size_m.jpg","sti":"Pritam,Kavita Seth,Neeraj Sridhar","lang":["Hindi"],"seo":"bandhu-20-from-cocktail-2","ty":"Track","language":"Hindi","scoreF":175637.53,"boostValue":126.32695046591571,"isPc":"0","alist":"[Pritam,Kavita Seth,Neeraj Sridhar]","isrc":"INS172605214","cat":"Love Story","pw":0,"tags":["New","Party","Happy","Chill","Dance","Romance","Bollywood","Retro"],"langBoostValue":57.176301590608794},{"iid":"41797150","id":41797150,"ti":"Tum Hi Ho Bandhu","aw":"https://a10.gaanacdn.com/gn_img/albums/lJvKa56KDV/vKa1ZO5mKD/size_m_1759319494.jpg","sti":"Kavita Seth,Pritam,Neeraj Sridhar","lang":["Hindi"],"seo":"tum-hi-ho-bandhu-9","ty":"Track","language":"Hindi","scoreF":3736.0583,"boostValue":121.34692002845824,"isPc":"0","alist":"[Kavita Seth,Pritam,Neeraj Sridhar]","isrc":"GBSGZ1200008","pw":0,"langBoostValue":54.88420860149043},{"iid":"82602206","id":82602206,"ti":"Tum Hi Ho","aw":"https://a10.gaanacdn.com/gn_img/albums/10q3Z1K52r/q3Z1L5v0K5/size_m.jpg","sti":"Kaish Muzic,Sarkaar Muzic","lang":["Hindi"],"seo":"tum-hi-ho-MWQM71XEWq","ty":"Track","language":"Hindi","scoreF":523183.6,"boostValue":47.65983124717316,"isPc":"0","alist":"[Kaish Muzic,Sarkaar Muzic]","isrc":"INDG12613248","pw":0,"langBoostValue":20.969223200245388},{"iid":"944317","id":944317,"ti":"Meri Aashiqui","aw":"https://a10.gaanacdn.com/gn_img/albums/d41WjnWPLq/41Wjz1LOWP/size_m_1712905431.jpg","sti":"Palak Muchhal,Arijit Singh","lang":["Hindi"],"seo":"meriaashiqui","ty":"Track","language":"Hindi","scoreF":5861.069,"boostValue":109.6569412795031,"isPc":"0","alist":"[Palak Muchhal,Arijit Singh]","isrc":"INS181303035","cat":"Love Story","isDolby":true,"isLyrics":true,"pw":0,"tags":["Romance","Bollywood"],"langBoostValue":49.50381611796525},{"iid":"1739997","id":1739997,"ti":"Uska Hi Banana","aw":"https://a10.gaanacdn.com/gn_img/albums/d41WjnWPLq/41Wjzk0NWP/size_m.jpg","sti":"Arijit Singh","lang":["Hindi"],"seo":"uska-hi-banana-2","ty":"Track","language":"Hindi","scoreF":3448.0652,"boostValue":86.2925607530953,"isPc":"0","alist":"[Arijit Singh]","isrc":"INS181204311","cat":"Love Story","pw":0,"tags":["Rock","Romance","Bollywood"],"langBoostValue":38.75020055833539},{"iid":"20825758","id":20825758,"ti":"Aashiqui 2 Mashup","aw":"https://a10.gaanacdn.com/gn_img/albums/qa4WEkqKP1/a4WE4nLG3P/size_m.jpg","sti":"Arijit Singh,Ankit Tiwari,Others","lang":["Hindi"],"seo":"aashiqui-2-mashup","ty":"Track","language":"Hindi","scoreF":5413.3896,"boostValue":102.7670195525077,"isPc":"0","alist":"[Arijit Singh,Ankit Tiwari,Others]","isrc":"INS181304182","cat":"Love Story","isLyrics":true,"pw":0,"tags":["Romance","Bollywood"],"langBoostValue":46.33268263106168},{"iid":"80851517","id":80851517,"ti":"My Universe (Tum Hi Ho)","aw":"https://a10.gaanacdn.com/gn_img/albums/81l3Mye3rM/l3MRpmy5Wr/size_m.jpg","sti":"Taj Desi Haan Ji","lang":["Hindi"],"seo":"my-universe-tum-hi-ho","ty":"Track","language":"Hindi","scoreF":219154.95,"boostValue":46.321239850645284,"isPc":"0","alist":"[Taj Desi Haan Ji]","isrc":"QT66A2605291","pw":0,"langBoostValue":20.353127376372846},{"iid":"75109227","id":75109227,"ti":"Vo Nahin (From \"Main Vaapas Aaunga\")","aw":"https://a10.gaanacdn.com/gn_img/albums/qa4WEkqKP1/4WEmnM6eWP/size_m_1793463939.jpg","sti":"A. R. Rahman,Irshad Kamil,Adithya RK","lang":["Hindi"],"seo":"vo-nahin-from-main-vaapas-aaunga","ty":"Track","language":"Hindi","scoreF":5230.8877,"boostValue":94.5911518014071,"isPc":"0","alist":"[A. R. Rahman,Irshad Kamil,Adithya RK]","isrc":"INT102604005","cat":"Love Story","isLyrics":true,"pw":0,"tags":["Chill","Sad","Romance","Bollywood","Fusion"],"langBoostValue":42.56968371215864},{"iid":"21074832","id":21074832,"ti":"Tum Hi Ho","aw":"https://a10.gaanacdn.com/gn_img/albums/koMWQ4B3qL/oMWQ5nY4Wq/size_m.jpg","sti":"Aaman Trikha","lang":["Malayalam"],"seo":"tum-hi-ho-14","ty":"Track","language":"Malayalam","scoreF":3046.5237,"boostValue":66.71633157024486,"isPc":"0","alist":"[Aaman Trikha]","isrc":"INS181402133","pw":0,"langBoostValue":35.66416357779273},{"iid":"23618610","id":23618610,"ti":"Tumse Milne Ko Dil","aw":"https://a10.gaanacdn.com/gn_img/albums/0wrb4qNKLg/wrb4rOyv3L/size_m_1713881189.jpg","sti":"Alka Yagnik,Kumar Sanu","lang":["Hindi"],"seo":"tumse-milne-ko-dil-1","ty":"Track","language":"Hindi","scoreF":5167.8237,"boostValue":102.74543605767398,"isPc":"0","alist":"[Alka Yagnik,Kumar Sanu]","isrc":"INT109100050","cat":"Love Story","isLyrics":true,"pw":0,"tags":["Romance","Bollywood"],"langBoostValue":46.322748680293635},{"iid":"17290929","id":17290929,"ti":"Tum Hi Ho (Instrumental)","aw":"https://a10.gaanacdn.com/gn_img/albums/0wrb4N3Lg7/wrb412y7KL/size_m.jpg","sti":"Mithoon","lang":["Hindi"],"seo":"tum-hi-ho-instrumental","ty":"Track","language":"Hindi","scoreF":185894.28,"boostValue":42.663193263336176,"isPc":"0","alist":"[Mithoon]","isrc":"INS181600441","pw":0,"tags":["Bollywood","Instrumental"],"langBoostValue":18.66948647458746},{"iid":"20825652","id":20825652,"ti":"The Arijit Singh Classic Mashup","aw":"https://a10.gaanacdn.com/gn_img/albums/21GWwR3pkg/1GWwgePwWp/size_m.jpg","sti":"Arijit Singh","lang":["Hindi"],"seo":"the-arijit-singh-classic-mashup","ty":"Track","language":"Hindi","scoreF":4660.3423,"boostValue":90.46092620631842,"isPc":"0","alist":"[Arijit Singh]","isrc":"INS181601419","cat":"Love Story","isLyrics":true,"pw":0,"tags":["Happy","Sad","Romance","Bollywood"],"langBoostValue":40.668719200220195},{"iid":"1739990","id":1739990,"ti":"Love Me Thoda Aur","aw":"https://a10.gaanacdn.com/gn_img/albums/d41WjnWPLq/41Wjzk0NWP/size_m.jpg","sti":"Arijit Singh","lang":["Hindi"],"seo":"love-me-thoda-aur-1","ty":"Track","language":"Hindi","scoreF":2712.9678,"boostValue":79.36985930418815,"isPc":"0","alist":"[Arijit Singh]","isrc":"INS181306569","cat":"Love Story","isDolby":true,"pw":0,"tags":["Romance","Bollywood"],"langBoostValue":35.56397998075581},{"iid":"25853356","id":25853356,"ti":"Tum Hi Ho-Rehnuma","aw":"https://a10.gaanacdn.com/gn_img/song/BZgWoQOK2d/gWoeqZEOK2/size_m_1553761414.jpg","sti":"Shreya Ghoshal,Armaan Malik","lang":["Hindi"],"seo":"tum-hi-ho-rehnuma","ty":"Track","language":"Hindi","scoreF":178198.7,"boostValue":61.35170965325412,"isPc":"0","alist":"[Shreya Ghoshal,Armaan Malik]","isrc":"INS181900547","cat":"Love Story","pw":0,"tags":["Pop","Romance","Fusion","Unplugged"],"langBoostValue":27.27100366053947},{"iid":"28923","id":28923,"ti":"Tumhi Ho Mata Pita Tumhi Ho","aw":"https://a10.gaanacdn.com/gn_img/albums/81l3Me3rMx/1l3MkNybrM/size_m.jpg","sti":"Lata Mangeshkar","lang":["Hindi"],"seo":"tumhi-ho-mata-pita-tumhi-ho","ty":"Track","language":"Hindi","scoreF":4192.82,"boostValue":75.62625605163846,"isPc":"0","alist":"[Lata Mangeshkar]","isrc":"INH100250230","isLyrics":true,"pw":0,"tags":["Old","Devotional","Bhajan","Retro"],"langBoostValue":33.84096104001402},{"iid":"1740001","id":1740001,"ti":"Duaa","aw":"https://a10.gaanacdn.com/gn_img/albums/d41WjnWPLq/41Wjzk0NWP/size_m.jpg","sti":"Nandini Srikar,Arijit Singh,Shekhar Ravjiani","lang":["Hindi"],"seo":"duaa-2","ty":"Track","language":"Hindi","scoreF":2686.0938,"boostValue":76.55734119235883,"isPc":"0","alist":"[Nandini Srikar,Arijit Singh,Shekhar Ravjiani]","isrc":"INS181201310","cat":"Love Story","isDolby":true,"pw":0,"tags":["Sad","Romance","Bollywood"],"langBoostValue":34.26949932911071},{"iid":"80531767","id":80531767,"ti":"Tum Hi Ho","aw":"https://a10.gaanacdn.com/gn_img/albums/VdNW0JMKo5/NW0DgY6EWo/size_m.jpg","sti":"Aftab,Khayaal","lang":["Hindi"],"seo":"tum-hi-ho-9KNjjLGdKB","ty":"Track","language":"Hindi","scoreF":163861.95,"boostValue":47.196850768571245,"isPc":"0","alist":"[Aftab,Khayaal]","isrc":"GXLET2658959","pw":0,"langBoostValue":20.75613327591073},{"iid":"20698951","id":20698951,"ti":"Tum Hi Ho","aw":"https://a10.gaanacdn.com/gn_img/albums/DwPKOxB3qV/wPKOpgDq3q/size_m_1718103769.jpg","sti":"Mithoon","lang":["Hindi"],"seo":"tum-hi-ho-11","ty":"Track","language":"Hindi","scoreF":155905.89,"boostValue":40.68382417186003,"isPc":"0","alist":"[Mithoon]","isrc":"INS181401422","pw":0,"tags":["Party","Bollywood","Instrumental"],"langBoostValue":17.758468344391783},{"iid":"79682907","id":79682907,"ti":"Tum Hi Ho","aw":"https://a10.gaanacdn.com/gn_img/albums/DwPKOxB3qV/PKORZDE6bq/size_m.jpg","sti":"Mohit Pandey","lang":["Hindi"],"seo":"tum-hi-ho-4W8dpoOvWx","ty":"Track","language":"Hindi","scoreF":139867.05,"boostValue":40,"isPc":"0","alist":"[Mohit Pandey]","isrc":"INV792621345","pw":0,"langBoostValue":17.44373360335067},{"iid":"81457317","id":81457317,"ti":"Tum Hi Ho","aw":"https://a10.gaanacdn.com/gn_img/albums/z8k3y13rxo/k3yDl026Kr/size_m.jpg","sti":"Raj Barman,Maidul Priyam","lang":["Hindi"],"seo":"tum-hi-ho-1Wj6rBweWP","ty":"Track","language":"Hindi","scoreF":138875.33,"boostValue":40,"isPc":"0","alist":"[Raj Barman,Maidul Priyam]","isrc":"IN9SL2601032","pw":0,"langBoostValue":17.44373360335067},{"iid":"81654555","id":81654555,"ti":"Tum Hi Ho","aw":"https://a10.gaanacdn.com/gn_img/albums/BZgWoQOK2d/gWomyG5OK2/size_m.jpg","sti":"Piyush Shukla","lang":["Hindi"],"seo":"tum-hi-ho-P37yrgEXbD","ty":"Track","language":"Hindi","scoreF":128811.25,"boostValue":40,"isPc":"0","alist":"[Piyush Shukla]","isrc":"DGA062435020","pw":0,"langBoostValue":17.44373360335067},{"iid":"77151511","id":77151511,"ti":"Tum Hi Se Pyaar (From \"Tera Yaar Hoon Main\")","aw":"https://a10.gaanacdn.com/gn_img/albums/Dk9KN2KBx1/9KNnOeRBKB/size_m.jpg","sti":"Jubin Nautiyal,Payal Dev,Aditya Dev","lang":["Hindi"],"seo":"tum-hi-se-pyaar-from-tera-yaar-hoon-main","ty":"Track","language":"Hindi","scoreF":118936.48,"boostValue":83.69954920623883,"isPc":"0","alist":"[Jubin Nautiyal,Payal Dev,Aditya Dev]","isrc":"INZ031421097","cat":"Love Story","pw":0,"tags":["New","Chill","Sad","Romance","Bollywood"],"langBoostValue":37.55674930097981},{"iid":"78522378","id":78522378,"ti":"Tum Hi Ho Mahadev Slowed & Reverb","aw":"https://a10.gaanacdn.com/gn_img/albums/9En3pqeWXD/n3pAPjv0WX/size_m.jpg","sti":"Dj Aarun","lang":["Hindi"],"seo":"tum-hi-ho-mahadev-slowed-reverb","ty":"Track","language":"Hindi","scoreF":94138.54,"boostValue":40,"isPc":"0","alist":"[Dj Aarun]","isrc":"INKA92320980","pw":0,"langBoostValue":17.44373360335067},{"iid":"78495699","id":78495699,"ti":"Tum Hi Ho Mahadev","aw":"https://a10.gaanacdn.com/gn_img/albums/10q3Z1K52r/q3Z1gY81K5/size_m.jpg","sti":"Dj Aarun","lang":["Hindi"],"seo":"tum-hi-ho-mahadev","ty":"Track","language":"Hindi","scoreF":94138.54,"boostValue":40,"isPc":"0","alist":"[Dj Aarun]","isrc":"INKA92320981","pw":0,"langBoostValue":17.44373360335067},{"iid":"76038426","id":76038426,"ti":"Tum Hi Ho","aw":"https://a10.gaanacdn.com/gn_img/albums/2lV3d1WRgB/V3dG7xerKR/size_m.jpg","sti":"Ravikant Sinha","lang":["Hindi"],"seo":"tum-hi-ho-8426-7603","ty":"Track","language":"Hindi","scoreF":91229.29,"boostValue":26.45046898970596,"isPc":"0","alist":"[Ravikant Sinha]","isrc":"INH512040307","pw":0,"langBoostValue":11.207469503247552},{"iid":"81742377","id":81742377,"ti":"Meri Saanson Mein Tum Hi Ho Meri Chahat Mein Tum Hi Ho","aw":"https://a10.gaanacdn.com/gn_img/albums/VdNW0Mbo5e/NW0DNLppWo/size_m.jpg","sti":"Ritin Animation","lang":["Hindi"],"seo":"meri-saanson-mein-tum-hi-ho-meri-chahat-mein-tum-hi-ho","ty":"Track","language":"Hindi","scoreF":90485.555,"boostValue":42.893084905102995,"isPc":"0","alist":"[Ritin Animation]","isrc":"GXLEW2676946","pw":0,"langBoostValue":18.77529567133198},{"iid":"40746","id":40746,"ti":"Maula Mere Maula","aw":"https://a10.gaanacdn.com/gn_img/albums/koMWQBbqLE/oMWQVq1bqL/size_m.jpg","sti":"Roop Kumar Rathod","lang":["Hindi"],"seo":"maula-mere-maula","ty":"Track","language":"Hindi","scoreF":4978.7505,"boostValue":118.36500900379701,"isPc":"0","alist":"[Roop Kumar Rathod]","isrc":"INH100629786","cat":"Love Story","isDolby":true,"isLyrics":true,"pw":0,"tags":["Romance","Folk","Bollywood"],"langBoostValue":53.51176370589451},{"iid":"57422373","id":57422373,"ti":"Tum Hi Ho (Piano House Mix)[Remix By Dj Rik]","aw":"https://a10.gaanacdn.com/gn_img/albums/qaLKY623pO/LKYApQDgKp/size_m_1712916283.jpg","sti":"Arijit Singh,Mithoon","lang":["Hindi"],"seo":"tum-hi-ho-piano-house-mix[remix-by-dj-rik]","ty":"Track","language":"Hindi","scoreF":79021.984,"boostValue":57.613595500354926,"isPc":"0","alist":"[Arijit Singh,Mithoon]","isrc":"INS182400003","pw":0,"tags":["Bollywood"],"langBoostValue":25.550511115365637},{"iid":"39545940","id":39545940,"ti":"Tum Hi Ho (Lofi Remake)","aw":"https://a10.gaanacdn.com/gn_img/albums/NOXWVRgWkq/XWVRLPD0Wk/size_m.jpg","sti":"Harshal Rajput,Lo-fi 2307","lang":["Hindi"],"seo":"tum-hi-ho-lofi-remake","ty":"Track","language":"Hindi","scoreF":78985.39,"boostValue":57.32696487301325,"isPc":"0","alist":"[Harshal Rajput,Lo-fi 2307]","isrc":"IND862101231","pw":0,"langBoostValue":25.418587413362754},{"iid":"21783450","id":21783450,"ti":"Darasal","aw":"https://a10.gaanacdn.com/gn_img/albums/dwN39y83DP/wN39neOdWD/size_m.jpg","sti":"Atif Aslam","lang":["Hindi"],"seo":"darasal","ty":"Track","language":"Hindi","scoreF":4572.342,"boostValue":100.71125713838866,"isPc":"0","alist":"[Atif Aslam]","isrc":"INS181700993","cat":"Love Story","isLyrics":true,"pw":0,"tags":["Happy","Romance","Bollywood"],"langBoostValue":45.38650395286448},{"iid":"76663836","id":76663836,"ti":"Dil Ki Dhadkan Me Tum Hi Ho","aw":"https://a10.gaanacdn.com/gn_img/albums/oAJbDlbnL8/JbDDeq6Dbn/size_m.jpg","sti":"Morvik Vaishno,Aarvika Devi","lang":["Hindi"],"seo":"dil-ki-dhadkan-me-tum-hi-ho-3836-7666","ty":"Track","language":"Hindi","scoreF":76519.24,"boostValue":40,"isPc":"0","alist":"[Morvik Vaishno,Aarvika Devi]","isrc":"INT982637060","pw":0,"langBoostValue":17.44373360335067},{"iid":"81947124","id":81947124,"ti":"Barbad X Tum Hi Ho","aw":"https://a10.gaanacdn.com/gn_img/albums/Bp1bAnK029/1bAwd02N30/size_m.jpg","sti":"WB V2 MIX","lang":["Hindi"],"seo":"barbad-x-tum-hi-ho","ty":"Track","language":"Hindi","scoreF":74945.49,"boostValue":40,"isPc":"0","alist":"[WB V2 MIX]","isrc":"GXLEU2639204","pw":0,"langBoostValue":17.44373360335067},{"iid":"78060347","id":78060347,"ti":"Punya Ke Charo Dham Tum Hi Ho","aw":"https://a10.gaanacdn.com/gn_img/albums/6Zxb2r7b9w/xb2x67QQ39/size_m.jpg","sti":"Anubhav Mohanty","lang":["Hindi"],"seo":"punya-ke-charo-dham-tum-hi-ho","ty":"Track","language":"Hindi","scoreF":74442.57,"boostValue":40,"isPc":"0","alist":"[Anubhav Mohanty]","isrc":"INB6B2600414","pw":0,"langBoostValue":17.44373360335067},{"iid":"82347489","id":82347489,"ti":"Ho Patwar Tum Hi...Tum Hi Khaiweya...Hey Krishha Kanhaiya","aw":"https://a10.gaanacdn.com/gn_img/albums/10q3Z1K52r/q3Z17ZJ6K5/size_m.jpg","sti":"Shiva","lang":["Hindi"],"seo":"ho-patwar-tum-hitum-hi-khaiweyahey-krishha-kanhaiya","ty":"Track","language":"Hindi","scoreF":63353.16,"boostValue":40,"isPc":"0","alist":"[Shiva]","isrc":"INH512048240","pw":0,"langBoostValue":17.44373360335067},{"iid":"79501537","id":79501537,"ti":"Jidhar Dekhta Hun Udhar Tum Hi Tum Ho","aw":"https://a10.gaanacdn.com/gn_img/albums/zLp36PvbrG/p36DpRARbr/size_m.jpg","sti":"Bittu Mehta","lang":["Hindi"],"seo":"jidhar-dekhta-hun-udhar-tum-hi-tum-ho-k3y6n415Wr","ty":"Track","language":"Hindi","scoreF":61417.23,"boostValue":41.450959096839554,"isPc":"0","alist":"[Bittu Mehta]","isrc":"GBLLT2623751","pw":0,"langBoostValue":18.111547428011026},{"iid":"80653812","id":80653812,"ti":"Tum Hi Ho Na","aw":"https://a10.gaanacdn.com/gn_img/albums/d41WjznWPL/1Wj0Jgq6KP/size_m.jpg","sti":"Priyanka Kumari","lang":["Hindi"],"seo":"tum-hi-ho-na","ty":"Track","language":"Hindi","scoreF":59435.863,"boostValue":26.157696417905754,"isPc":"0","alist":"[Priyanka Kumari]","isrc":"INF592600267","pw":0,"langBoostValue":11.072718929399251},{"iid":"80612862","id":80612862,"ti":"Khatu Wale Tum Hi Sahara Ho","aw":"https://a10.gaanacdn.com/gn_img/albums/0wrb4kNWLg/rb4A9ex7KL/size_m.jpg","sti":"Rahul Sehgal","lang":["Hindi"],"seo":"khatu-wale-tum-hi-sahara-ho","ty":"Track","language":"Hindi","scoreF":58473.285,"boostValue":40,"isPc":"0","alist":"[Rahul Sehgal]","isrc":"INT502604605","pw":0,"langBoostValue":17.44373360335067},{"iid":"82670323","id":82670323,"ti":"Jidhar Dekhta Hun Udhar Tum Hi Tum Ho","aw":"https://a10.gaanacdn.com/gn_img/albums/z8k3y13rxo/k3yDRr71Kr/size_m.jpg","sti":"Nikhil-Vinay","lang":["English"],"seo":"jidhar-dekhta-hun-udhar-tum-hi-tum-ho-9KNMgjDGbB","ty":"Track","language":"English","scoreF":57589.164,"boostValue":40,"isPc":"0","alist":"[Nikhil-Vinay]","isrc":"GXLER2642147","pw":0,"langBoostValue":19.468844711563154},{"iid":"77297184","id":77297184,"ti":"Saiya Humse Ho Naraj Tum Naraj Hi Rahiyo","aw":"https://a10.gaanacdn.com/gn_img/albums/81l3Me3rMx/l3MRBGAyWr/size_m.jpg","sti":"Sheela Kalson","lang":["Hindi"],"seo":"saiya-humse-ho-naraj-tum-naraj-hi-rahiyo","ty":"Track","language":"Hindi","scoreF":56265.28,"boostValue":40,"isPc":"0","alist":"[Sheela Kalson]","isrc":"FRX282655285","pw":0,"langBoostValue":17.44373360335067},{"iid":"80201195","id":80201195,"ti":"Tum Hi Tan Man Ke Malik Ho Mohan","aw":"https://a10.gaanacdn.com/gn_img/albums/mGjKr1b6zX/jKrnzzQyK6/size_m.jpg","sti":"Meenu Arora","lang":["Hindi"],"seo":"tum-hi-tan-man-ke-malik-ho-mohan","ty":"Track","language":"Hindi","scoreF":55717.387,"boostValue":40,"isPc":"0","alist":"[Meenu Arora]","isrc":"FRX762642276","pw":0,"langBoostValue":17.44373360335067}],"stxt":"Songs"}],"srId":"74a5ed9b-6eb3-4860-a8c9-f972502b3c89","algo":"NEWSEARCH","action":0,"q":"tum hi ho","originalQuery":"Tum Hi Ho","abFlag":26}
+\ No newline at end of file
+diff --git a/tests/test_albums.py b/tests/test_albums.py
+index 1385756..af8638f 100644
+--- a/tests/test_albums.py
++++ b/tests/test_albums.py
+@@ -152,13 +152,15 @@ async def test_format_json_albums_info_includes_unpadded_track_stream_url():
+         "seokey": "test-track",
+         "urls": {"medium": {"message": encrypted_link(stream_url)}}
+     }
++    # The albumDetail payload is formatted directly (no second albumDetail request); a
++    # track without title/artwork is looked up with songDetail.
+     formatter = AlbumTracksFormatter([
+-        {"tracks": [{"seokey": "test-track"}]},
+         {"tracks": [track]},
+     ])
+ 
+     result = await formatter.format_json_albums(
+-        {"album": {"seokey": "test-album"}}, info=True
++        {"album": {"seokey": "test-album"}, "tracks": [{"seokey": "test-track"}]}, info=True
+     )
+ 
+     assert result["tracks"][0]["stream_urls"]["urls"]["medium_quality"] == stream_url
++    assert formatter._safe_request.await_count == 1
+diff --git a/tests/test_app_routes.py b/tests/test_app_routes.py
+new file mode 100644
+index 0000000..0cb8a46
+--- /dev/null
++++ b/tests/test_app_routes.py
+@@ -0,0 +1,186 @@
++"""Local fix: route validation and the error bodies callers rely on.
++
++Offline: the GaanaPy object behind the routes is a fake. Requests go straight to the
++ASGI app (starlette's TestClient needs an HTTP client package this venv doesn't have).
++"""
++
++import asyncio
++import json
++from urllib.parse import urlencode
++
++import pytest
++
++import app as app_module
++from api.errors import BlockedError, UpstreamUnavailable
++
++
++class FakeGaana:
++    def __init__(self, outcome=None):
++        self.outcome = outcome
++        self.calls = []
++
++    def _answer(self, name, *args):
++        self.calls.append((name, args))
++        if isinstance(self.outcome, Exception):
++            raise self.outcome
++        return self.outcome if self.outcome is not None else [{"seokey": "x"}]
++
++    async def search_songs(self, *args):
++        return self._answer("search_songs", *args)
++
++    async def search_albums(self, *args):
++        return self._answer("search_albums", *args)
++
++    async def search_artists(self, *args):
++        return self._answer("search_artists", *args)
++
++    async def get_playlist_info(self, *args):
++        return self._answer("get_playlist_info", *args)
++
++    async def get_track_info(self, *args, **kwargs):
++        return self._answer("get_track_info", *args)
++
++
++class Response:
++    def __init__(self, status_code, headers, body):
++        self.status_code = status_code
++        self.headers = headers
++        self.body = body
++
++    def json(self):
++        return json.loads(self.body)
++
++
++class AsgiClient:
++    """Minimal GET-only ASGI client (no lifespan: the fake is installed directly)."""
++
++    def __init__(self, asgi_app):
++        self.app = asgi_app
++
++    def get(self, path, params=None):
++        return asyncio.run(self._get(path, params or {}))
++
++    async def _get(self, path, params):
++        scope = {
++            "type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1", "method": "GET",
++            "scheme": "http", "path": path, "raw_path": path.encode(), "root_path": "",
++            "query_string": urlencode(params).encode(), "headers": [(b"host", b"test")],
++            "client": ("test", 1), "server": ("test", 80),
++        }
++        sent = {"status": None, "headers": {}, "body": b""}
++
++        async def receive():
++            return {"type": "http.request", "body": b"", "more_body": False}
++
++        async def send(message):
++            if message["type"] == "http.response.start":
++                sent["status"] = message["status"]
++                sent["headers"] = {k.decode().lower(): v.decode() for k, v in message["headers"]}
++            elif message["type"] == "http.response.body":
++                sent["body"] += message.get("body", b"")
++
++        try:
++            await self.app(scope, receive, send)
++        except Exception:
++            # Starlette re-raises unhandled errors after the 500 handler has answered.
++            if sent["status"] is None:
++                raise
++        return Response(sent["status"], {k.title(): v for k, v in sent["headers"].items()}, sent["body"])
++
++
++@pytest.fixture
++def client(monkeypatch):
++    def make(outcome=None):
++        fake = FakeGaana(outcome)
++        monkeypatch.setattr(app_module, "gaanapy", fake)
++        return AsgiClient(app_module.app), fake
++    return make
++
++
++@pytest.mark.parametrize("query", [
++    "മലരേ", "கொலவெறி", "तुम ही हो", "Beyoncé", "P!nk", "Simon & Garfunkel", "AC/DC (Live)?",
++])
++@pytest.mark.parametrize("route", ["/songs/search/", "/albums/search/", "/artists/search/"])
++def test_search_accepts_any_script_and_punctuation(client, route, query):
++    http, fake = client()
++
++    response = http.get(route, params={"query": query})
++
++    assert response.status_code == 200
++    assert fake.calls[0][1] == (query, 10, 1)
++
++
++def test_search_query_is_cleaned(client):
++    http, fake = client()
++
++    response = http.get("/songs/search/", params={"query": "  Tum\tHi\x00  Ho\n", "limit": 5, "page": 3})
++
++    assert response.status_code == 200
++    assert fake.calls[0][1] == ("Tum Hi Ho", 5, 3)
++
++
++@pytest.mark.parametrize("params", [
++    {"query": "   \t\n"},
++    {"query": ""},
++    {"query": "x" * 201},
++    {"query": "ok", "page": 0},
++    {"query": "ok", "page": 21},
++    {"query": "ok", "limit": 101},
++])
++def test_search_rejects_invalid_input(client, params):
++    http, fake = client()
++
++    assert http.get("/songs/search/", params=params).status_code == 422
++    assert fake.calls == []
++
++
++def test_block_is_503_with_retry_after(client):
++    http, _ = client(BlockedError(403, 120))
++
++    response = http.get("/songs/search/", params={"query": "Tum Hi Ho"})
++
++    assert response.status_code == 503
++    assert response.json() == {"error": "blocked", "upstream_status": 403, "retry_after": 120}
++    assert response.headers["Retry-After"] == "120"
++
++
++def test_outage_is_502(client):
++    http, _ = client(UpstreamUnavailable("Gaana unreachable: ServerTimeoutError"))
++
++    response = http.get("/songs/search/", params={"query": "Tum Hi Ho"})
++
++    assert response.status_code == 502
++    assert response.json() == {"error": "upstream_unavailable", "detail": "Gaana unreachable: ServerTimeoutError"}
++
++
++def test_bug_is_500_not_an_upstream_error(client):
++    http, _ = client(AttributeError("'NoneType' object has no attribute 'replace'"))
++
++    response = http.get("/songs/search/", params={"query": "Tum Hi Ho"})
++
++    assert response.status_code == 500
++    assert response.json() == {"error": "internal", "detail": "AttributeError"}
++
++
++def test_no_results_is_still_404(client):
++    http, _ = client({"error": "Unable to find any results!"})
++
++    response = http.get("/songs/search/", params={"query": "zzzz"})
++
++    assert response.status_code == 404
++    assert response.json() == {"detail": "Unable to find any results!"}
++
++
++def test_playlist_limit_defaults_to_50(client):
++    http, fake = client()
++
++    assert http.get("/playlists/info/", params={"seokey": "gaana-dj-hindi-top-50-1"}).status_code == 200
++    assert http.get("/playlists/info/", params={"seokey": "top-50", "limit": 5}).status_code == 200
++    assert [c[1] for c in fake.calls] == [("gaana-dj-hindi-top-50-1", 50), ("top-50", 5)]
++
++
++def test_mixed_case_seokeys_from_search_can_be_looked_up(client):
++    http, fake = client()
++
++    assert http.get("/songs/info/", params={"seokey": "tum-hi-ho-MWQM71XEWq"}).status_code == 200
++    assert fake.calls[0][1] == (["tum-hi-ho-MWQM71XEWq"],)
+diff --git a/tests/test_discovery.py b/tests/test_discovery.py
+index cd19592..f8ada52 100644
+--- a/tests/test_discovery.py
++++ b/tests/test_discovery.py
+@@ -3,6 +3,8 @@ from unittest.mock import AsyncMock
+ import re
+ 
+ from api.discovery.discovery import Discovery
++from api.functions import Functions
++from api.songs.songs import Songs
+ from api.errors import Errors
+ from api import endpoints
+ from app import ARTIST_ID_PATTERN
+@@ -33,14 +35,51 @@ async def test_similar_albums_are_formatted_with_required_headers():
+     assert "User-Agent" in call.kwargs["headers"]
+ 
+ 
++class FakeArtistTracks(Discovery, Songs):
++    def __init__(self, response):
++        self.api_endpoints = endpoints
++        self.errors = Errors()
++        self.functions = AsyncMock(spec=Functions)
++        self.functions.decryptLink.return_value = "https://cdn.gaana.com/hls/64.mp4"
++        self._safe_request = AsyncMock(return_value=response)
++
++
++ARTIST_TRACK_RECORD = {
++    "seokey": "track",
++    "entity_id": "80692668",
++    "name": "Song",
++    "language": "Hindi",
++    "artwork": "https://a10.gaanacdn.com/images/albums/1/crop_175x175_1.jpg",
++    "atw": "https://a10.gaanacdn.com/gn_img/albums/x/y/size_m_1712905431.jpg",
++    "entity_type": "TR",
++    "entity_info": [
++        {"key": "artist", "value": [{"name": "Arijit Singh", "seokey": "arijit-singh", "artist_id": 1}]},
++        {"key": "album", "value": [{"album_id": "9", "album_seokey": "the-album", "name": "The Album"}]},
++        {"key": "duration", "value": "261"},
++        {"key": "stream_url", "value": {"medium": {"message": "encrypted"}}},
++    ],
++}
++
++
+ @pytest.mark.asyncio
+ async def test_artist_tracks_are_formatted_and_paginated_with_headers():
+-    discovery = FakeDiscovery({"tracks": [{"seokey": "track", "track_title": "Song"}], "total": 20})
++    discovery = FakeArtistTracks({"tracks": [ARTIST_TRACK_RECORD], "total": 20})
+ 
+     result = await discovery.get_artist_tracks("456", 5, 2)
+ 
+-    assert result["tracks"][0]["stream_urls"]["urls"]["medium_quality"] == "url"
++    track = result["tracks"][0]
++    assert track["seokey"] == "track"
++    assert track["track_id"] == "80692668"
++    assert track["title"] == "Song"
++    assert track["artists"] == "Arijit Singh"
++    assert track["artist_seokeys"] == "arijit-singh"
++    assert track["artist_ids"] == "1"
++    assert track["album"] == "The Album" and track["album_seokey"] == "the-album"
++    assert track["duration"] == "261"
++    assert track["stream_urls"]["urls"]["medium_quality"] == "https://cdn.gaana.com/hls/64.mp4"
+     assert result["total"] == 20
++    # Built from the record itself: one Gaana request, no songDetail lookup.
++    assert discovery._safe_request.await_count == 1
+     call = discovery._safe_request.await_args
+     assert call.kwargs["params"] == {
+         "sortBy": "popularity", "sortOrder": 0, "request_type": "web",
+diff --git a/tests/test_lite_rows.py b/tests/test_lite_rows.py
+new file mode 100644
+index 0000000..43ee695
+--- /dev/null
++++ b/tests/test_lite_rows.py
+@@ -0,0 +1,403 @@
++"""Local fix: search and list rows are built from the list payload itself.
++
++Offline: Gaana's answers are recorded responses (tests/fixtures/search_*.json, recorded
++from https://gaana.com/apiv2?...&type=search) or small hand-written payloads.
++"""
++
++import json
++from pathlib import Path
++
++import pytest
++
++from api.entities import (
++    album_row_from_entity, artist_row_from_entity, artwork_urls, song_row_from_entity,
++)
++from api.errors import BlockedError, UpstreamUnavailable
++from api.gaanapy import GaanaPy
++
++FIXTURES = Path(__file__).parent / "fixtures"
++SONG_KEYS = {
++    "seokey", "album_seokey", "track_id", "title", "artists", "artist_seokeys", "artist_ids",
++    "artist_image", "album", "album_id", "duration", "popularity", "genres", "is_explicit",
++    "language", "label", "release_date", "play_count", "favorite_count", "song_url",
++    "album_url", "images", "stream_urls",
++}
++
++
++def recorded(name: str) -> dict:
++    return json.loads((FIXTURES / name).read_text(encoding="utf-8"))
++
++
++async def gaana_answering(answer):
++    """A real GaanaPy whose Gaana calls are answered by `answer(url, kwargs)`."""
++    g = GaanaPy()
++    await g.aiohttp.close()
++    g.calls = []
++
++    async def stub(method, url, **kwargs):
++        g.calls.append((url, kwargs))
++        result = answer(url, kwargs)
++        if isinstance(result, Exception):
++            raise result
++        return result
++
++    g._request_now = stub
++    return g
++
++
++def song_detail(seokey: str) -> dict:
++    return {"tracks": [{
++        "seokey": seokey, "track_id": "1", "track_title": seokey.title(),
++        "artist": [{"name": "A", "seokey": "a", "artist_id": "7"}],
++        "artwork": "https://img/size_s.jpg", "urls": {},
++    }]}
++
++
++# --- artwork sizes --------------------------------------------------------------------
++
++@pytest.mark.parametrize("url,large,small", [
++    ("https://a10.gaanacdn.com/gn_img/albums/d4/41/size_m_1712905431.jpg",
++     "https://a10.gaanacdn.com/gn_img/albums/d4/41/size_l_1712905431.jpg",
++     "https://a10.gaanacdn.com/gn_img/albums/d4/41/size_s_1712905431.jpg"),
++    ("https://cdn.gaana.com/images/test/size_s.jpg",
++     "https://cdn.gaana.com/images/test/size_l.jpg",
++     "https://cdn.gaana.com/images/test/size_s.jpg"),
++    ("https://a10.gaanacdn.com/images/playlists/27/1038627/crop_175x175_1793105696_1038627.jpg",
++     "https://a10.gaanacdn.com/images/playlists/27/1038627/crop_175x175_1793105696_1038627.jpg",
++     "https://a10.gaanacdn.com/images/playlists/27/1038627/crop_175x175_1793105696_1038627.jpg"),
++])
++def test_artwork_sizes_handle_timestamped_urls(url, large, small):
++    sizes = artwork_urls(url)
++    assert sizes["large_artwork"] == large
++    assert sizes["small_artwork"] == small
++
++
++def test_artwork_sizes_of_nothing_are_empty():
++    assert artwork_urls(None) == {"large_artwork": "", "medium_artwork": "", "small_artwork": ""}
++
++
++@pytest.mark.asyncio
++async def test_recorded_chart_artwork_gets_real_sizes():
++    g = await gaana_answering(lambda url, kw: recorded("charts_top.json"))
++    charts = await g.get_charts(5)
++    first = charts[0]
++    assert first["seokey"] == "gaana-dj-hindi-top-50-1"
++    assert first["images"]["urls"]["large_artwork"].endswith("/size_l_1793105696.jpg")
++    assert first["images"]["urls"]["small_artwork"].endswith("/size_s_1793105696.jpg")
++
++
++# --- the shared entity mapper ---------------------------------------------------------
++
++def test_mapper_reads_flat_song_detail_shape():
++    row = song_row_from_entity({
++        "seokey": "tumhiho", "track_id": 944286, "track_title": "Tum Hi Ho",
++        "artist": [{"name": "Mithoon", "seokey": "mithoon", "artist_id": "1"},
++                   {"name": "Arijit Singh", "seokey": "arijit-singh", "artist_id": 2}],
++        "album_title": "Aashiqui 2", "albumseokey": "aashiqui-2", "album_id": "5",
++        "duration": "262", "language": "Hindi", "parental_warning": 0,
++        "artwork": "https://img/size_s.jpg", "artwork_web": "https://img/size_m.jpg",
++        "artwork_large": "https://img/size_l.jpg",
++    })
++    assert row["track_id"] == "944286"
++    assert row["artists"] == "Mithoon, Arijit Singh"
++    assert row["artist_seokeys"] == "mithoon, arijit-singh"
++    assert row["artist_ids"] == "1, 2"
++    assert (row["album"], row["album_seokey"], row["album_id"]) == ("Aashiqui 2", "aashiqui-2", "5")
++    assert row["duration"] == "262"
++    assert row["images"]["urls"] == {
++        "large_artwork": "https://img/size_l.jpg",
++        "medium_artwork": "https://img/size_m.jpg",
++        "small_artwork": "https://img/size_s.jpg",
++    }
++    assert row["lite"] is True and set(row) == SONG_KEYS | {"lite"}
++
++
++def test_mapper_reads_entity_info_shape():
++    row = song_row_from_entity({
++        "seokey": "song-x", "entity_id": "80692668", "name": "Song X", "language": "Tamil",
++        "entity_type": "TR",
++        "artwork": "https://img/crop_175x175_1.jpg",
++        "atw": "https://img/gn/size_m_1793105696.jpg",
++        "artwork_medium": "https://img/crop_480x480_1.jpg",
++        "entity_info": [
++            {"key": "artist", "value": [{"name": "Anirudh", "seokey": "anirudh", "artist_id": "9"}]},
++            {"key": "album", "value": [{"album_id": "3", "album_seokey": "alb", "name": "Alb"}]},
++            {"key": "duration", "value": 201},
++            {"key": "parental_warning", "value": 1},
++        ],
++    })
++    assert row["track_id"] == "80692668"
++    assert row["title"] == "Song X"
++    assert (row["artists"], row["artist_seokeys"], row["artist_ids"]) == ("Anirudh", "anirudh", "9")
++    assert (row["album"], row["album_seokey"], row["album_id"]) == ("Alb", "alb", "3")
++    assert row["duration"] == "201"
++    assert row["is_explicit"] is True
++    assert row["images"]["urls"]["large_artwork"] == "https://img/crop_480x480_1.jpg"
++    assert row["images"]["urls"]["medium_artwork"] == "https://img/gn/size_m_1793105696.jpg"
++
++
++@pytest.mark.parametrize("entity", [
++    {"seokey": "x", "track_title": "X"},                         # no artwork
++    {"seokey": "x", "artwork": "https://img/size_s.jpg"},        # no title
++    {"track_title": "X", "artwork": "https://img/size_s.jpg"},   # no seokey
++    {"seokey": "x", "name": "X", "atw": "https://i", "entity_type": "AL"},  # an album
++    "not-a-dict",
++])
++def test_mapper_returns_none_when_a_row_cannot_be_built(entity):
++    assert song_row_from_entity(entity) is None
++
++
++def test_album_and_artist_rows_from_search_hits():
++    album = album_row_from_entity({"seo": "aashiqui-2", "id": 501, "ti": "Aashiqui 2",
++                                   "aw": "https://img/size_m_5.jpg", "sti": "Mithoon,Arijit Singh",
++                                   "language": "Hindi"})
++    assert album["album_id"] == "501" and album["title"] == "Aashiqui 2"
++    assert album["artists"] == "Mithoon, Arijit Singh"
++    assert album["images"]["urls"]["large_artwork"] == "https://img/size_l_5.jpg"
++    assert album["lite"] is True
++
++    artist = artist_row_from_entity({"seo": "arijit-singh", "id": 2, "ti": "Arijit Singh",
++                                     "aw": "https://img/size_m_9.jpg"})
++    assert artist["artist_id"] == "2" and artist["name"] == "Arijit Singh"
++    assert artist["images"]["urls"]["small_artwork"] == "https://img/size_s_9.jpg"
++
++
++# --- search ---------------------------------------------------------------------------
++
++@pytest.mark.asyncio
++async def test_song_search_rows_come_from_the_recorded_hits_in_one_request():
++    g = await gaana_answering(lambda url, kw: recorded("search_tracks_tum_hi_ho.json"))
++
++    rows = await g.search_songs("Tum Hi Ho", 10)
++
++    assert len(g.calls) == 1  # no songDetail per row
++    assert len(rows) == 10
++    first = rows[0]
++    assert first["seokey"] == "tumhiho"
++    assert first["track_id"] == "944286"
++    assert first["title"] == "Tum Hi Ho"
++    assert first["artists"] == "Mithoon, Arijit Singh"
++    assert first["artist_seokeys"] == "" and first["artist_ids"] == ""
++    assert first["language"] == "Hindi"
++    assert first["duration"] == "" and first["album"] == ""
++    assert first["stream_urls"] == {"urls": {}}
++    assert first["lite"] is True
++    assert first["images"]["urls"] == {
++        "large_artwork": "https://a10.gaanacdn.com/gn_img/albums/d41WjnWPLq/41Wjz1LOWP/size_l_1712905431.jpg",
++        "medium_artwork": "https://a10.gaanacdn.com/gn_img/albums/d41WjnWPLq/41Wjz1LOWP/size_m_1712905431.jpg",
++        "small_artwork": "https://a10.gaanacdn.com/gn_img/albums/d41WjnWPLq/41Wjz1LOWP/size_s_1712905431.jpg",
++    }
++    assert set(first) == SONG_KEYS | {"lite"}
++    # Ids are Gaana's own, in Gaana's order - never positions.
++    hits = recorded("search_tracks_tum_hi_ho.json")["gr"][0]["gd"]
++    assert [r["seokey"] for r in rows] == [h["seo"] for h in hits[:10]]
++    assert [r["track_id"] for r in rows] == [str(h["id"]) for h in hits[:10]]
++
++
++@pytest.mark.asyncio
++async def test_search_pages_are_slices_of_the_first_result_page():
++    g = await gaana_answering(lambda url, kw: recorded("search_tracks_tum_hi_ho.json"))
++    hits = recorded("search_tracks_tum_hi_ho.json")["gr"][0]["gd"]  # 41 hits
++
++    page2 = await g.search_songs("Tum Hi Ho", 10, page=2)
++    page5 = await g.search_songs("Tum Hi Ho", 10, page=5)
++    past_end = await g.search_songs("Tum Hi Ho", 10, page=6)
++
++    assert [r["seokey"] for r in page2] == [h["seo"] for h in hits[10:20]]
++    assert [r["seokey"] for r in page5] == [h["seo"] for h in hits[40:41]]
++    assert past_end == {"error": "Unable to find any results!"}
++    assert len(g.calls) == 1  # later pages are served from the cached response
++
++
++@pytest.mark.asyncio
++async def test_native_script_query_results():
++    g = await gaana_answering(lambda url, kw: recorded("search_tracks_malare.json"))
++
++    rows = await g.search_songs("മലരേ", 5)
++
++    assert g.calls[0][1]["params"]["keyword"] == "മലരേ"
++    assert rows[0]["seokey"] == "malare"
++    assert rows[0]["artists"] == "S. Janaki, Vidyasagar, S. P. Balasubrahmanyam"
++
++
++@pytest.mark.asyncio
++async def test_album_and_artist_search_are_one_request_each():
++    hits = {"gr": [{"ty": "Album", "gd": [
++        {"seo": "aashiqui-2", "id": 501, "ti": "Aashiqui 2", "aw": "https://img/size_m.jpg", "language": "Hindi"},
++        {"seo": "", "ti": "no seokey"},
++    ]}]}
++    g = await gaana_answering(lambda url, kw: hits)
++
++    albums = await g.search_albums("Aashiqui", 10)
++    artists = await g.search_artists("Aashiqui", 10)
++
++    assert [a["seokey"] for a in albums] == ["aashiqui-2"]
++    assert [a["seokey"] for a in artists] == ["aashiqui-2"]
++    assert [c[1]["params"]["secType"] for c in g.calls] == ["album", "artist"]
++
++
++# --- lists ----------------------------------------------------------------------------
++
++@pytest.mark.asyncio
++async def test_trending_rows_come_from_the_payload_when_it_has_the_fields():
++    entity = {"seokey": "s1", "entity_id": "1", "name": "S1", "atw": "https://img/size_m.jpg",
++              "entity_type": "TR", "language": "Hindi"}
++    g = await gaana_answering(lambda url, kw: {"entities": [entity] * 1 + [dict(entity, seokey="s2")]})
++
++    rows = await g.get_trending("Hindi", 10)
++
++    assert [r["seokey"] for r in rows] == ["s1", "s2"]
++    assert len(g.calls) == 1
++
++
++@pytest.mark.asyncio
++async def test_partial_fan_out_failure_keeps_the_successes():
++    def answer(url, kw):
++        if "miscTrendingSongs" in url:
++            return {"entities": [{"seokey": "a"}, {"seokey": "b"}, {"seokey": "c"}]}
++        if url.endswith("=b"):
++            return BlockedError(403, 120)
++        return song_detail(url.rsplit("=", 1)[1])
++
++    g = await gaana_answering(answer)
++    g.breaker.trip = lambda *a, **k: 120  # the stub raises the block itself
++
++    rows = await g.get_trending("Hindi", 10)
++
++    assert [r["seokey"] for r in rows] == ["a", "c"]
++    assert rows[0]["stream_urls"]["urls"]["medium_quality"] == ""  # full songDetail row
++
++
++@pytest.mark.asyncio
++async def test_fan_out_where_everything_is_blocked_reports_the_block():
++    def answer(url, kw):
++        if "miscTrendingSongs" in url:
++            return {"entities": [{"seokey": "a"}, {"seokey": "b"}]}
++        return UpstreamUnavailable("timeout") if url.endswith("=a") else BlockedError(403, 60)
++
++    g = await gaana_answering(answer)
++
++    with pytest.raises(BlockedError):
++        await g.get_trending("Hindi", 10)
++
++
++@pytest.mark.asyncio
++async def test_fallback_lookups_are_capped_at_limit():
++    def answer(url, kw):
++        if "miscTrendingSongs" in url:
++            return {"entities": [{"seokey": f"s{i}"} for i in range(30)]}
++        return song_detail(url.rsplit("=", 1)[1])
++
++    g = await gaana_answering(answer)
++
++    rows = await g.get_trending("Hindi", 5)
++
++    assert [r["seokey"] for r in rows] == ["s0", "s1", "s2", "s3", "s4"]
++    assert len(g.calls) == 1 + 5
++
++
++def _new_release(kind: str, i: int) -> dict:
++    return {"seokey": f"{kind.lower()}-{i}", "entity_id": str(i), "name": f"{kind} {i}",
++            "entity_type": kind, "atw": "https://img/size_m.jpg", "language": "Tamil"}
++
++
++@pytest.mark.asyncio
++async def test_new_releases_limit_applies_to_each_type():
++    entities = [_new_release("AL", i) for i in range(12)] + [_new_release("TR", i) for i in range(12)]
++    g = await gaana_answering(lambda url, kw: {"entities": entities})
++
++    result = await g.get_new_releases("Tamil", 5)
++
++    assert [t["seokey"] for t in result["tracks"]] == [f"tr-{i}" for i in range(5)]
++    assert [a["seokey"] for a in result["albums"]] == [f"al-{i}" for i in range(5)]
++    assert len(g.calls) == 1
++
++
++@pytest.mark.asyncio
++async def test_new_releases_with_one_type_only_gives_an_empty_list_for_the_other():
++    g = await gaana_answering(lambda url, kw: {"entities": [_new_release("AL", i) for i in range(3)]})
++
++    result = await g.get_new_releases("Tamil", 10)
++
++    assert result["tracks"] == []
++    assert len(result["albums"]) == 3
++
++
++@pytest.mark.asyncio
++async def test_new_release_albums_without_artwork_fall_back_to_album_detail():
++    def answer(url, kw):
++        if "miscNewRelease" in url:
++            return {"entities": [{"seokey": "bare", "entity_type": "AL"}]}
++        return {"album": {"seokey": "bare", "title": "Bare", "artwork": "https://img/size_s.jpg",
++                          "artist": [{"name": "A", "seokey": "a", "artist_id": "1"}]}}
++
++    g = await gaana_answering(answer)
++
++    result = await g.get_new_releases("Tamil", 10)
++
++    assert result["albums"][0]["title"] == "Bare"
++    assert result["albums"][0]["artist_seokeys"] == "a"
++
++
++@pytest.mark.asyncio
++async def test_playlist_is_limited_and_built_from_its_tracks():
++    tracks = [{"seokey": f"t{i}", "track_title": f"T{i}", "artwork": "https://img/size_s.jpg",
++               "artist": [{"name": "A", "seokey": "a", "artist_id": "1"}]} for i in range(60)]
++    g = await gaana_answering(lambda url, kw: {"count": "60", "tracks": tracks, "error": "SUCCESS"})
++
++    default = await g.get_playlist_info("top-50")
++    three = await g.get_playlist_info("top-50", 3)
++
++    assert len(default) == 50
++    assert [t["seokey"] for t in three] == ["t0", "t1", "t2"]
++    assert len(g.calls) == 1
++
++
++@pytest.mark.asyncio
++async def test_album_info_fetches_album_detail_once_and_uses_the_album_artists():
++    detail = {
++        "album": {"seokey": "alb", "title": "Alb", "artwork": "https://img/size_s_1712905431.jpg",
++                  "artist": [{"name": "Composer", "seokey": "composer", "artist_id": "11"}]},
++        "tracks": [{"seokey": "t1", "track_title": "T1", "artwork": "https://img/size_s.jpg",
++                    "artist": [{"name": "Singer", "seokey": "singer", "artist_id": "22"}]}],
++    }
++    g = await gaana_answering(lambda url, kw: detail)
++
++    [album] = await g.get_album_info(["alb"], True)
++
++    assert len(g.calls) == 1
++    assert (album["artists"], album["artist_seokeys"], album["artist_ids"]) == ("Composer", "composer", "11")
++    assert album["images"]["urls"]["large_artwork"] == "https://img/size_l_1712905431.jpg"
++    assert [t["seokey"] for t in album["tracks"]] == ["t1"]
++    assert album["tracks"][0]["artist_seokeys"] == "singer"
++
++
++@pytest.mark.asyncio
++async def test_album_artist_keys_are_not_borrowed_from_a_different_first_track_artist():
++    detail = {
++        "album": {"seokey": "alb", "title": "Alb", "artist": [{"name": "Composer"}]},
++        "tracks": [{"seokey": "t1", "artist": [{"name": "Singer", "seokey": "singer", "artist_id": "22"}]}],
++    }
++    g = await gaana_answering(lambda url, kw: detail)
++
++    [album] = await g.get_album_info(["alb"], False)
++
++    assert album["artists"] == "Composer"
++    assert album["artist_seokeys"] == "" and album["artist_ids"] == ""
++
++
++@pytest.mark.asyncio
++async def test_artist_top_tracks_come_from_the_track_list():
++    def answer(url, kw):
++        if "artistDetail" in url:
++            return {"artist": [{"seokey": "arijit-singh", "artist_id": "2", "name": "Arijit Singh",
++                                "atw": "https://img/size_m.jpg"}]}
++        return {"entities": [_new_release("TR", i) for i in range(7)]}
++
++    g = await gaana_answering(answer)
++
++    [artist] = await g.get_artist_info(["arijit-singh"], True, 3, 2)
++
++    assert [t["seokey"] for t in artist["top_tracks"]] == ["tr-3", "tr-4", "tr-5"]
++    assert artist["total_tracks"] == 7
++    assert len(g.calls) == 2
+diff --git a/tests/test_upstream.py b/tests/test_upstream.py
+new file mode 100644
+index 0000000..64d3729
+--- /dev/null
++++ b/tests/test_upstream.py
+@@ -0,0 +1,274 @@
++"""Local fix: request layer (headers, circuit breaker, pacing, list cache, error kinds).
++
++Offline: aiohttp's session is replaced by a fake; nothing is sent to Gaana.
++"""
++
++import asyncio
++import json
++import time
++
++import aiohttp
++import pytest
++import pytest_asyncio
++from yarl import URL
++
++from api import endpoints
++from api.errors import BlockedError, UpstreamUnavailable
++from api.gaanapy import GaanaPy
++from api.upstream import CircuitBreaker, Pacer, ResponseCache
++
++
++class FakeResponse:
++    def __init__(self, status=200, body=None, headers=None, raw=None):
++        self.status = status
++        self.headers = headers or {}
++        self._raw = raw if raw is not None else json.dumps(body if body is not None else {}).encode()
++
++    async def read(self):
++        return self._raw
++
++    async def __aenter__(self):
++        return self
++
++    async def __aexit__(self, *exc):
++        return False
++
++
++class FakeSession:
++    """Records every request; answers from a list of responses (or exceptions)."""
++
++    def __init__(self, *responses):
++        self.responses = list(responses)
++        self.calls = []
++
++    def request(self, method, url, **kwargs):
++        self.calls.append({"method": method, "url": url, **kwargs})
++        answer = self.responses.pop(0) if len(self.responses) > 1 else self.responses[0]
++        if isinstance(answer, Exception):
++            raise answer
++        return answer
++
++    async def close(self):
++        pass
++
++
++@pytest_asyncio.fixture(loop_scope="function")
++async def gaana():
++    g = GaanaPy()
++    await g.aiohttp.close()
++    yield g
++
++
++def use(g, *responses) -> FakeSession:
++    g.aiohttp = FakeSession(*responses)
++    return g.aiohttp
++
++
++@pytest.mark.asyncio
++async def test_requests_do_not_impersonate_a_browser(gaana):
++    session = use(gaana, FakeResponse(body={"entities": []}))
++
++    await gaana._safe_request("POST", endpoints.trending_url, headers={"Cookie": "__ul=Hindi;"})
++
++    headers = session.calls[0]["headers"]
++    # No faked browser identity: aiohttp's own User-Agent is sent.
++    assert "User-Agent" not in headers and "Origin" not in headers and "Referer" not in headers
++    assert headers["Accept"] == "application/json, text/plain, */*"
++    assert headers["Cookie"] == "__ul=Hindi;"  # per-call headers are kept
++
++
++@pytest.mark.asyncio
++async def test_unicode_keyword_is_sent_url_encoded_as_a_parameter(gaana):
++    session = use(gaana, FakeResponse(body={"gr": [{"gd": []}]}))
++
++    await gaana.search_songs("മലരേ & Simon", 10)
++
++    call = session.calls[0]
++    assert call["url"] == endpoints.search_url  # nothing concatenated onto the URL
++    assert call["params"]["keyword"] == "മലരേ & Simon"
++    assert call["params"]["secType"] == "track"
++    sent = str(URL(call["url"]).with_query(call["params"]))
++    assert "keyword=%E0%B4%AE%E0%B4%B2%E0%B4%B0%E0%B5%87" in sent
++    assert "%26" in sent  # '&' no longer splits the keyword
++
++
++@pytest.mark.asyncio
++async def test_breaker_opens_on_403_and_short_circuits(gaana):
++    session = use(gaana, FakeResponse(status=403, raw=b"<HTML>Access Denied</HTML>"))
++
++    with pytest.raises(BlockedError) as first:
++        await gaana._safe_request("POST", endpoints.trending_url)
++    assert first.value.status == 403
++    assert first.value.retry_after == 120
++
++    with pytest.raises(BlockedError) as second:
++        await gaana.search_songs("Tum Hi Ho", 10)
++    assert second.value.status == 403
++    assert 0 < second.value.retry_after <= 120
++    assert len(session.calls) == 1  # the second call never reached Gaana
++
++
++@pytest.mark.parametrize("status", [401, 429])
++@pytest.mark.asyncio
++async def test_other_refusals_are_blocks_too(gaana, status):
++    use(gaana, FakeResponse(status=status, headers={"Retry-After": "300"}))
++
++    with pytest.raises(BlockedError) as blocked:
++        await gaana._safe_request("POST", endpoints.trending_url)
++    assert blocked.value.status == status
++    assert blocked.value.retry_after == 300  # Gaana's Retry-After wins when longer
++
++
++def test_breaker_doubles_on_repeat_up_to_900_and_resets_on_success():
++    now = [0.0]
++    breaker = CircuitBreaker(cooldown=120, clock=lambda: now[0])
++
++    assert breaker.trip(403) == 120
++    assert breaker.trip(403) == 120  # same block reported by a parallel request
++    now[0] += 121
++    assert breaker.trip(403) == 240
++    for expected in (480, 900, 900):
++        now[0] += 1000
++        assert breaker.trip(429) == expected
++    now[0] += 1000
++    breaker.success()
++    assert breaker.trip(403) == 120
++
++
++@pytest.mark.asyncio
++async def test_server_errors_and_network_failures_are_unavailable_not_blocked(gaana):
++    use(gaana, FakeResponse(status=502))
++    with pytest.raises(UpstreamUnavailable):
++        await gaana._safe_request("POST", endpoints.trending_url)
++
++    use(gaana, aiohttp.ClientConnectionError("reset"))
++    with pytest.raises(UpstreamUnavailable):
++        await gaana._safe_request("POST", endpoints.trending_url)
++
++    use(gaana, asyncio.TimeoutError())
++    with pytest.raises(UpstreamUnavailable):
++        await gaana._safe_request("POST", endpoints.trending_url)
++
++    gaana.breaker.check()  # none of these opened the breaker
++
++
++@pytest.mark.asyncio
++async def test_non_json_body_is_no_results(gaana):
++    use(gaana, FakeResponse(raw=b"<html>not json</html>"))
++
++    assert await gaana._safe_request("POST", endpoints.trending_url) == {"error": "Unable to find any results!"}
++
++
++@pytest.mark.asyncio
++async def test_list_responses_are_cached_but_song_details_are_not(gaana):
++    session = use(gaana, FakeResponse(body={"entities": [{"seokey": "a"}]}))
++
++    first = await gaana._safe_request("POST", endpoints.trending_url, headers={"Cookie": "__ul=Hindi;"})
++    first["entities"].clear()  # callers can't damage the cached copy
++    second = await gaana._safe_request("POST", endpoints.trending_url, headers={"Cookie": "__ul=Hindi;"})
++    assert second == {"entities": [{"seokey": "a"}]}
++    assert len(session.calls) == 1
++
++    await gaana._safe_request("POST", endpoints.trending_url, headers={"Cookie": "__ul=Tamil;"})
++    assert len(session.calls) == 2  # another language is another list
++
++    await gaana._safe_request("POST", endpoints.song_details_url + "a", cache=False)
++    await gaana._safe_request("POST", endpoints.song_details_url + "a", cache=False)
++    assert len(session.calls) == 4
++
++
++@pytest.mark.asyncio
++async def test_no_results_are_not_cached(gaana):
++    session = use(gaana, FakeResponse(status=404))
++
++    await gaana._safe_request("POST", endpoints.trending_url)
++    await gaana._safe_request("POST", endpoints.trending_url)
++
++    assert len(session.calls) == 2
++
++
++def test_cache_entries_expire():
++    now = [0.0]
++    cache = ResponseCache(ttl=600, clock=lambda: now[0])
++    key = cache.key("POST", "https://x", {"params": {"keyword": "a"}})
++    cache.put(key, {"v": 1})
++    assert cache.get(key) == {"v": 1}
++    now[0] += 601
++    assert cache.get(key) is None
++
++
++@pytest.mark.asyncio
++async def test_request_starts_are_spaced_out(monkeypatch):
++    monkeypatch.setenv("GAANA_MIN_INTERVAL_MS", "200")
++    now = [100.0]
++    slept = []
++
++    async def fake_sleep(seconds):
++        slept.append(round(seconds, 3))
++        now[0] += seconds
++
++    monkeypatch.setattr("api.upstream.asyncio.sleep", fake_sleep)
++    g = GaanaPy()
++    await g.aiohttp.close()
++    assert g._pacer.interval == 0.2
++    g._pacer._clock = lambda: now[0]
++    starts = []
++
++    async def stub(method, url, **kwargs):
++        starts.append(round(now[0], 3))
++        return {}
++
++    g._request_now = stub
++    await asyncio.gather(*[g._safe_request("POST", f"https://example.invalid/{i}") for i in range(4)])
++
++    assert starts == [100.0, 100.2, 100.4, 100.6]
++    assert slept == [0.2, 0.2, 0.2]
++
++
++@pytest.mark.asyncio
++async def test_requests_waiting_in_the_pacer_do_not_go_out_after_a_block(monkeypatch):
++    monkeypatch.setenv("GAANA_MIN_INTERVAL_MS", "200")
++    real_sleep = asyncio.sleep
++    now = [100.0]
++    pacer_sleeps = []
++    g = GaanaPy()
++    await g.aiohttp.close()
++    g._pacer._clock = lambda: now[0]
++    g.breaker._clock = lambda: now[0]
++
++    async def fake_sleep(seconds):
++        # Wait in the pacer until the first request has been refused by Gaana.
++        pacer_sleeps.append(round(seconds, 3))
++        now[0] += seconds
++        while g.breaker.remaining() == 0:
++            await real_sleep(0)
++
++    class SlowRefusal(FakeResponse):
++        async def __aenter__(self):
++            # Gaana answers only once the other three requests are queued in the pacer.
++            while len(pacer_sleeps) < 3:
++                await real_sleep(0)
++            return self
++
++    monkeypatch.setattr("api.upstream.asyncio.sleep", fake_sleep)
++    session = use(g, SlowRefusal(status=403, raw=b"<HTML>Access Denied</HTML>"))
++
++    results = await asyncio.wait_for(asyncio.gather(
++        *[g._safe_request("POST", f"https://example.invalid/{i}") for i in range(4)],
++        return_exceptions=True,
++    ), timeout=5)
++
++    # Only the first request reached Gaana; the three already past the semaphore and
++    # sleeping in the pacer were refused by the breaker once their turn came.
++    assert pacer_sleeps == [0.2, 0.2, 0.2]  # three requests were queued in the pacer
++    assert len(session.calls) == 1
++    assert all(isinstance(r, BlockedError) and r.status == 403 for r in results)
++
++
++@pytest.mark.asyncio
++async def test_pacer_without_interval_does_not_wait():
++    pacer = Pacer(interval_ms=0)
++    started = time.monotonic()
++    for _ in range(50):
++        await pacer.wait()
++    assert time.monotonic() - started < 0.05

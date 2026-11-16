@@ -87,7 +87,8 @@ class PlaylistService:
             **summary.model_dump(),
             owner_id=playlist.owner_id,
             tracks=[
-                UserPlaylistEntry(track=catalog_repo.song_to_track(e.song), position=e.position, added_at=e.added_at)
+                UserPlaylistEntry(track=catalog_repo.song_to_track(e.song, self.catalog.provider.name),
+                                  position=e.position, added_at=e.added_at)
                 for e in entries
             ],
         )

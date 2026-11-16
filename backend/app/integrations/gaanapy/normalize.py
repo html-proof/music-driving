@@ -90,6 +90,21 @@ def stream_expiry(url: str) -> datetime | None:
         return None
 
 
+def playable(raw: dict) -> bool:
+    """True unless the provider positively reports the song as unstreamable.
+
+    Lite rows (built straight from a Gaana list, `"lite": true`) and rows without any
+    stream information carry no stream URLs: the stream is resolved at play time via
+    songDetail. Only a full song record whose stream URL slots are all empty means Gaana
+    has no stream for it."""
+    if (raw or {}).get("lite"):
+        return True
+    urls = ((raw or {}).get("stream_urls") or {}).get("urls") or {}
+    if not any(key in urls for key in _QUALITY_KEYS.values()):
+        return True  # nothing reported: unknown, resolved when played
+    return bool(stream_urls(raw))
+
+
 def track(raw: dict) -> Track:
     album_title = _s(raw.get("album"))
     return Track(
@@ -106,7 +121,7 @@ def track(raw: dict) -> Track:
         is_explicit=bool(raw.get("is_explicit")),
         release_date=_s(raw.get("release_date")),
         artwork=artwork(raw),
-        playable=bool(stream_urls(raw)),
+        playable=playable(raw),
         provider_url=_s(raw.get("song_url")),
     )
 
@@ -166,7 +181,14 @@ def playlist_summary(raw: dict) -> PlaylistSummary:
 
 
 def records(payload: Any) -> list[dict]:
-    """GaanaPy returns lists, or {'error': ...} objects for empty sections."""
-    if isinstance(payload, list):
-        return [r for r in payload if isinstance(r, dict) and r.get("seokey")]
-    return []
+    """GaanaPy returns lists, or {'error': ...} objects for empty sections. Rows are
+    de-duplicated by seokey (first one wins), never re-keyed by position."""
+    if not isinstance(payload, list):
+        return []
+    seen: set[str] = set()
+    rows = []
+    for r in payload:
+        if isinstance(r, dict) and isinstance(r.get("seokey"), str) and r["seokey"] and r["seokey"] not in seen:
+            seen.add(r["seokey"])
+            rows.append(r)
+    return rows
