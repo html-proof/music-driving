@@ -35,14 +35,24 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   bool _loading = false;
   Object? _error;
   SearchResults? _results;
+  int _requestId = 0;
 
   void _onChanged(String value) {
     _debounce?.cancel();
+    // Cancel immediately, including the debounce window, so an older response
+    // cannot replace results for text the user has already changed.
+    _cancel?.cancel();
+    ++_requestId;
+    if (value.trim().isEmpty) {
+      _search('');
+      return;
+    }
     _debounce = Timer(AppConfig.searchDebounce, () => _search(value));
   }
 
   Future<void> _search(String raw, {bool save = false}) async {
     final q = raw.trim();
+    final requestId = ++_requestId;
     _cancel?.cancel(); // drop the previous in-flight request
     if (q.isEmpty) {
       setState(() {
@@ -61,14 +71,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     });
     try {
       final r = await ref.read(musicRepositoryProvider).search(q, cancelToken: token, save: save);
-      if (!mounted || token.isCancelled) return;
+      if (!mounted || token.isCancelled || requestId != _requestId) return;
       setState(() {
         _results = r;
         _loading = false;
       });
       if (save) ref.invalidate(searchHistoryProvider);
     } catch (e) {
-      if (!mounted || token.isCancelled) return;
+      if (!mounted || token.isCancelled || requestId != _requestId) return;
       setState(() {
         _error = e;
         _loading = false;

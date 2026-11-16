@@ -35,7 +35,9 @@ log = logging.getLogger(__name__)
 T = TypeVar("T")
 
 # GaanaPy rejects anything outside this character set with a 422.
-_QUERY_ALLOWED = re.compile(r"[^a-zA-Z0-9\s\-'.&]")
+# Keep Unicode letters and marks intact. Gaana accepts native-script search text;
+# stripping it to ASCII made regional-language searches silently search for nothing.
+_QUERY_ALLOWED = re.compile(r"[^\w\s\-'.&\u0300-\u036f\u0900-\u0dff]", re.UNICODE)
 
 
 def sanitize_query(q: str) -> str:

@@ -41,7 +41,8 @@ def test_parse_lrc_handles_multi_stamps_and_ignores_metadata():
 
 
 def test_sanitize_query():
-    assert sanitize_query("  héllo   wörld!! ") == "h llo w rld"
+    assert sanitize_query("  héllo   wörld!! ") == "héllo wörld"
+    assert sanitize_query("മലരേ அன்பே") == "മലരേ அன்பே"
     assert sanitize_query("AC/DC & friends") == "AC DC & friends"
 
 

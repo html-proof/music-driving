@@ -43,6 +43,13 @@ async def test_search_strips_unsupported_characters(client, fake_gaana):
     assert r.json()["songs"][0]["id"] == "tyler-herro"
 
 
+async def test_search_preserves_unicode_query_for_provider(client, fake_gaana):
+    r = await client.get(f"{API}/search", params={"q": "മലരേ"})
+    assert r.status_code == 200
+    assert r.json()["query"] == "മലരേ"
+    assert fake_gaana.calls.count("/songs/search/") == 1
+
+
 async def test_search_reports_provider_outage_per_section(client, fake_gaana):
     fake_gaana.down = True
     r = await client.get(f"{API}/search", params={"q": "something new"})
