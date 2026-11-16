@@ -1,0 +1,1118 @@
+{
+ "gr": [
+  {
+   "ty": "Track",
+   "gd": [
+    {
+     "iid": "20980268",
+     "id": 20980268,
+     "ti": "Starboy",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/BZgWoOW2d9/ZgWoVp9532/size_m.jpg",
+     "sti": "The Weeknd,Daft Punk",
+     "lang": [
+      "English"
+     ],
+     "seo": "starboy-6",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 2120.946,
+     "hf": 1,
+     "boostValue": 129.76885939494437,
+     "isPc": "0",
+     "alist": "[The Weeknd,Daft Punk]",
+     "isrc": "USUG11600977",
+     "cat": "Love Story",
+     "pw": 0,
+     "tags": [
+      "Pop",
+      "Party",
+      "Happy",
+      "Sexy",
+      "Dance",
+      "Romance"
+     ],
+     "langBoostValue": 65.58219519953992
+    },
+    {
+     "iid": "28883310",
+     "id": 28883310,
+     "ti": "Blinding Lights",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/9MAWe97WyJ/MAWeG6wRKy/size_m.jpg",
+     "sti": "The Weeknd",
+     "lang": [
+      "English"
+     ],
+     "seo": "blinding-lights-8",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 449408.03,
+     "boostValue": 129.65191621703264,
+     "isPc": "0",
+     "alist": "[The Weeknd]",
+     "isrc": "USUG11904206",
+     "pw": 0,
+     "tags": [
+      "Pop",
+      "Party"
+     ],
+     "langBoostValue": 65.52212267788187
+    },
+    {
+     "iid": "59871388",
+     "id": 59871388,
+     "ti": "Dancing In The Flames",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/BZgWoOW2d9/gWozYagE32/size_m.jpg",
+     "sti": "The Weeknd",
+     "lang": [
+      "English"
+     ],
+     "seo": "dancing-in-the-flames-3",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 420959.62,
+     "boostValue": 112.24620907600183,
+     "isPc": "0",
+     "alist": "[The Weeknd]",
+     "isrc": "USUG12405844",
+     "cat": "Love Story",
+     "pw": 0,
+     "tags": [
+      "Pop",
+      "Party",
+      "Rnb",
+      "Romance"
+     ],
+     "langBoostValue": 56.5809878645923
+    },
+    {
+     "iid": "20980271",
+     "id": 20980271,
+     "ti": "Reminder",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/BZgWoOW2d9/ZgWoVp9532/size_m.jpg",
+     "sti": "The Weeknd",
+     "lang": [
+      "English"
+     ],
+     "seo": "reminder-59",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 1884.1449,
+     "boostValue": 100.90587905224507,
+     "isPc": "0",
+     "alist": "[The Weeknd]",
+     "isrc": "USUG11600982",
+     "pw": 0,
+     "tags": [
+      "Pop",
+      "Party",
+      "Happy",
+      "R&b"
+     ],
+     "langBoostValue": 50.755575616296845
+    },
+    {
+     "iid": "16433549",
+     "id": 16433549,
+     "ti": "Hymn for the Weekend",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/a7LWBkzbzX/7LWBnrvjWz/size_m.jpg",
+     "sti": "Coldplay",
+     "lang": [
+      "English"
+     ],
+     "seo": "hymn-for-the-weekend",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 144228.58,
+     "boostValue": 116.1525038275824,
+     "isPc": "0",
+     "alist": "[Coldplay]",
+     "isrc": "GBAYE1500979",
+     "pw": 0,
+     "tags": [
+      "Alternative",
+      "Party",
+      "Rock",
+      "Happy",
+      "Motivational"
+     ],
+     "langBoostValue": 58.587611767392204
+    },
+    {
+     "iid": "29831625",
+     "id": 29831625,
+     "ti": "After Hours",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/kGxbnw0Ky4/Gxbn8m9q3y/size_m.jpg",
+     "sti": "The Weeknd",
+     "lang": [
+      "English"
+     ],
+     "seo": "after-hours-644",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 1776.6405,
+     "boostValue": 99.95984146405809,
+     "isPc": "0",
+     "alist": "[The Weeknd]",
+     "isrc": "USUG12000586",
+     "cat": "Love Story",
+     "pw": 0,
+     "tags": [
+      "Sexy",
+      "Romance",
+      "R&b"
+     ],
+     "langBoostValue": 50.26960572458935
+    },
+    {
+     "iid": "52234343",
+     "id": 52234343,
+     "ti": "Popular (From The Idol Vol. 1 (Music from the HBO Original Series))",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/w4MKPgOboj/MKPg0z0obo/size_m.jpg",
+     "sti": "The Weeknd,Playboi Carti,Madonna",
+     "lang": [
+      "English"
+     ],
+     "seo": "popular-214",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 143509.3,
+     "boostValue": 107.841064887234,
+     "isPc": "0",
+     "alist": "[The Weeknd,Playboi Carti,Madonna]",
+     "isrc": "USUG12303876",
+     "pw": 1,
+     "tags": [
+      "Pop",
+      "Party"
+     ],
+     "langBoostValue": 54.31811007717368
+    },
+    {
+     "iid": "20983229",
+     "id": 20983229,
+     "ti": "Starboy",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/lJvKa56KDV/JvKarZ443D/size_m.jpg",
+     "sti": "The Weeknd,Daft Punk",
+     "lang": [
+      "English"
+     ],
+     "seo": "starboy-7",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 1765.5466,
+     "boostValue": 107.18611020681313,
+     "isPc": "0",
+     "alist": "[The Weeknd,Daft Punk]",
+     "isrc": "USUG11600976",
+     "pw": 1,
+     "tags": [
+      "Pop",
+      "Rap",
+      "Party",
+      "Happy",
+      "Rnb",
+      "Motivational"
+     ],
+     "langBoostValue": 53.98166651605955
+    },
+    {
+     "iid": "23052638",
+     "id": 23052638,
+     "ti": "Pray For Me",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/XzVWRyL3dq/zVWRnPAkWd/size_m.jpg",
+     "sti": "The Weeknd,Kendrick Lamar",
+     "lang": [
+      "English"
+     ],
+     "seo": "pray-for-me-173",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 138862.22,
+     "boostValue": 107.88335973491793,
+     "isPc": "0",
+     "alist": "[The Weeknd,Kendrick Lamar]",
+     "isrc": "USUM71800001",
+     "pw": 1,
+     "tags": [
+      "Pop",
+      "Rap",
+      "Techno",
+      "Party",
+      "Happy",
+      "Motivational",
+      "Rnb",
+      "Hip Hop"
+     ],
+     "langBoostValue": 54.3398365104628
+    },
+    {
+     "iid": "20983232",
+     "id": 20983232,
+     "ti": "Reminder",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/lJvKa56KDV/JvKarZ443D/size_m.jpg",
+     "sti": "The Weeknd",
+     "lang": [
+      "English"
+     ],
+     "seo": "reminder-60",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 1566.9135,
+     "boostValue": 83.07461212955255,
+     "isPc": "0",
+     "alist": "[The Weeknd]",
+     "isrc": "USUG11600998",
+     "pw": 1,
+     "tags": [
+      "Pop",
+      "Party",
+      "Happy",
+      "R&b"
+     ],
+     "langBoostValue": 41.59583506937512
+    },
+    {
+     "iid": "62974020",
+     "id": 62974020,
+     "ti": "Cry For Me",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/z8k3yd1Krx/k3y7wVA6br/size_m_1777499307.jpg",
+     "sti": "The Weeknd",
+     "lang": [
+      "English"
+     ],
+     "seo": "cry-for-me-121",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 136320.16,
+     "boostValue": 106.2029137543113,
+     "isPc": "0",
+     "alist": "[The Weeknd]",
+     "isrc": "USUG12501129",
+     "pw": 1,
+     "tags": [
+      "Pop",
+      "Rnb"
+     ],
+     "langBoostValue": 53.47660849350763
+    },
+    {
+     "iid": "20980284",
+     "id": 20980284,
+     "ti": "Die For You",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/BZgWoOW2d9/ZgWoVp9532/size_m.jpg",
+     "sti": "The Weeknd",
+     "lang": [
+      "English"
+     ],
+     "seo": "die-for-you-45",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 1434.2124,
+     "boostValue": 89.67881174721815,
+     "isPc": "0",
+     "alist": "[The Weeknd]",
+     "isrc": "USUG11600995",
+     "cat": "Love Story",
+     "pw": 0,
+     "tags": [
+      "Pop",
+      "Happy",
+      "Romance",
+      "R&b"
+     ],
+     "langBoostValue": 44.98834527519296
+    },
+    {
+     "iid": "54948140",
+     "id": 54948140,
+     "ti": "One Of The Girls",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/MmqK5EKwRO/qK5ZxOLQ3w/size_m.jpg",
+     "sti": "The Weeknd,Jennie,Lily Rose Depp",
+     "lang": [
+      "English"
+     ],
+     "seo": "one-of-the-girls-10",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 135607.12,
+     "boostValue": 102.37606592527175,
+     "isPc": "0",
+     "alist": "[The Weeknd,Jennie,Lily Rose Depp]",
+     "isrc": "USUG12303881",
+     "pw": 0,
+     "tags": [
+      "Sexy",
+      "Chill",
+      "Rnb"
+     ],
+     "langBoostValue": 51.510795667165844
+    },
+    {
+     "iid": "62974031",
+     "id": 62974031,
+     "ti": "Timeless",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/z8k3yd1Krx/k3y7wVA6br/size_m_1777499307.jpg",
+     "sti": "The Weeknd,Playboi Carti",
+     "lang": [
+      "English"
+     ],
+     "seo": "timeless-1341",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 133832.72,
+     "boostValue": 104.89177662688499,
+     "isPc": "0",
+     "alist": "[The Weeknd,Playboi Carti]",
+     "isrc": "USUG12406536",
+     "pw": 1,
+     "tags": [
+      "Pop",
+      "Chill",
+      "Rnb"
+     ],
+     "langBoostValue": 52.803090680066255
+    },
+    {
+     "iid": "62975507",
+     "id": 62975507,
+     "ti": "São Paulo",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/lJvKa56KDV/vKad6Zw6bD/size_m_1777499306.jpg",
+     "sti": "The Weeknd,Anitta",
+     "lang": [
+      "English"
+     ],
+     "seo": "so-paulo-105",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 132821.61,
+     "boostValue": 103.10845760540855,
+     "isPc": "0",
+     "alist": "[The Weeknd,Anitta]",
+     "isrc": "USUG12405459",
+     "pw": 0,
+     "tags": [
+      "Party",
+      "Dance"
+     ],
+     "langBoostValue": 51.887017827815555
+    },
+    {
+     "iid": "29831623",
+     "id": 29831623,
+     "ti": "Save Your Tears",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/kGxbnw0Ky4/Gxbn8m9q3y/size_m.jpg",
+     "sti": "The Weeknd",
+     "lang": [
+      "English"
+     ],
+     "seo": "save-your-tears-13",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 125906.63,
+     "boostValue": 97.11037430791427,
+     "isPc": "0",
+     "alist": "[The Weeknd]",
+     "isrc": "USUG12000658",
+     "pw": 1,
+     "tags": [
+      "Pop",
+      "Party"
+     ],
+     "langBoostValue": 48.805863413938596
+    },
+    {
+     "iid": "20980285",
+     "id": 20980285,
+     "ti": "I Feel It Coming",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/BZgWoOW2d9/ZgWoVp9532/size_m.jpg",
+     "sti": "The Weeknd,Daft Punk",
+     "lang": [
+      "English"
+     ],
+     "seo": "i-feel-it-coming-3",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 124965.04,
+     "boostValue": 97.9417083435398,
+     "isPc": "0",
+     "alist": "[The Weeknd,Daft Punk]",
+     "isrc": "USUG11600996",
+     "pw": 0,
+     "tags": [
+      "Pop",
+      "Party",
+      "Happy",
+      "Chill"
+     ],
+     "langBoostValue": 49.23291125676263
+    },
+    {
+     "iid": "29831622",
+     "id": 29831622,
+     "ti": "In Your Eyes",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/kGxbnw0Ky4/Gxbn8m9q3y/size_m.jpg",
+     "sti": "The Weeknd",
+     "lang": [
+      "English"
+     ],
+     "seo": "in-your-eyes-728",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 122002.64,
+     "boostValue": 95.04856734541006,
+     "isPc": "0",
+     "alist": "[The Weeknd]",
+     "isrc": "USUG12000657",
+     "cat": "Love Story",
+     "pw": 1,
+     "tags": [
+      "Pop",
+      "Party",
+      "Motivational",
+      "Romance"
+     ],
+     "langBoostValue": 47.746734137468565
+    },
+    {
+     "iid": "35993146",
+     "id": 35993146,
+     "ti": "Save Your Tears (Remix)",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/Oxd3xP3gVY/d3xzNEp5bg/size_m_1619161205.jpg",
+     "sti": "The Weeknd,Ariana Grande",
+     "lang": [
+      "English"
+     ],
+     "seo": "save-your-tears-66",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 119076.4,
+     "boostValue": 93.32646631468288,
+     "isPc": "0",
+     "alist": "[The Weeknd,Ariana Grande]",
+     "isrc": "USUG12101839",
+     "cat": "Love Story",
+     "pw": 0,
+     "tags": [
+      "Romance"
+     ],
+     "langBoostValue": 46.86210834472845
+    },
+    {
+     "iid": "15197756",
+     "id": 15197756,
+     "ti": "The Hills",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/BZgWoQOK2d/ZgWoGek2W2/size_m.jpg",
+     "sti": "The Weeknd",
+     "lang": [
+      "English"
+     ],
+     "seo": "the-hills-30",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 115598.664,
+     "boostValue": 85.21163146518265,
+     "isPc": "0",
+     "alist": "[The Weeknd]",
+     "isrc": "USUG11500737",
+     "cat": "Love Story",
+     "pw": 1,
+     "tags": [
+      "Pop",
+      "Party",
+      "Motivational",
+      "Romance",
+      "R&b"
+     ],
+     "langBoostValue": 42.69360017731682
+    },
+    {
+     "iid": "23247003",
+     "id": 23247003,
+     "ti": "I Was Never There",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/10q3Z1K52r/0q3Zno1135/size_m.jpg",
+     "sti": "The Weeknd,Gesaffelstein",
+     "lang": [
+      "English"
+     ],
+     "seo": "i-was-never-there-3",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 113770.21,
+     "boostValue": 88.3189889434797,
+     "isPc": "0",
+     "alist": "[The Weeknd,Gesaffelstein]",
+     "isrc": "USUG11800570",
+     "pw": 0,
+     "tags": [
+      "R&b"
+     ],
+     "langBoostValue": 44.28981812476483
+    },
+    {
+     "iid": "62974022",
+     "id": 62974022,
+     "ti": "São Paulo",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/z8k3yd1Krx/k3y7wVA6br/size_m_1777499307.jpg",
+     "sti": "The Weeknd,Anitta",
+     "lang": [
+      "English"
+     ],
+     "seo": "so-paulo-104",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 109479.88,
+     "boostValue": 86.23638633194392,
+     "isPc": "0",
+     "alist": "[The Weeknd,Anitta]",
+     "isrc": "USUG12405846",
+     "pw": 1,
+     "tags": [
+      "Pop",
+      "Chill",
+      "Rnb"
+     ],
+     "langBoostValue": 43.22000633479423
+    },
+    {
+     "iid": "23247000",
+     "id": 23247000,
+     "ti": "Call Out My Name",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/10q3Z1K52r/0q3Zno1135/size_m.jpg",
+     "sti": "The Weeknd",
+     "lang": [
+      "English"
+     ],
+     "seo": "call-out-my-name-12",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 108554.58,
+     "boostValue": 84.57159112273759,
+     "isPc": "0",
+     "alist": "[The Weeknd]",
+     "isrc": "USUG11800560",
+     "cat": "Love Story",
+     "pw": 0,
+     "tags": [
+      "Pop",
+      "Chill",
+      "Sad",
+      "Motivational",
+      "Romance"
+     ],
+     "langBoostValue": 42.364817960002874
+    },
+    {
+     "iid": "20997442",
+     "id": 20997442,
+     "ti": "Often (Kygo Remix)",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/7rVW1Rbk56/rVW1d0L53k/size_m.jpg",
+     "sti": "The Weeknd",
+     "lang": [
+      "English"
+     ],
+     "seo": "oftenkygo-remix",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 107250.09,
+     "boostValue": 83.55530182539886,
+     "isPc": "0",
+     "alist": "[The Weeknd]",
+     "isrc": "USUG11500524",
+     "pw": 1,
+     "tags": [
+      "Remix",
+      "R&b"
+     ],
+     "langBoostValue": 41.842760479477505
+    },
+    {
+     "iid": "2708885",
+     "id": 2708885,
+     "ti": "Love Me Harder",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/Dk9KN2KBx1/k9KNgNy63B/size_m.jpg",
+     "sti": "Ariana Grande,The Weeknd",
+     "lang": [
+      "English"
+     ],
+     "seo": "love-me-harder",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 107095.73,
+     "boostValue": 83.93658413374132,
+     "isPc": "0",
+     "alist": "[Ariana Grande,The Weeknd]",
+     "isrc": "USUM71409728",
+     "cat": "Love Story",
+     "pw": 0,
+     "tags": [
+      "Pop",
+      "Party",
+      "Sexy",
+      "Romance"
+     ],
+     "langBoostValue": 42.038621325186895
+    },
+    {
+     "iid": "50409227",
+     "id": 50409227,
+     "ti": "Die For You (Remix)",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/ZaP37RKDy7/P37OY0rv3D/size_m.jpg",
+     "sti": "The Weeknd,Ariana Grande",
+     "lang": [
+      "English"
+     ],
+     "seo": "die-for-you-175",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 105960.31,
+     "boostValue": 83.04669854473158,
+     "isPc": "0",
+     "alist": "[The Weeknd,Ariana Grande]",
+     "isrc": "USUG12301287",
+     "cat": "Love Story",
+     "pw": 0,
+     "tags": [
+      "Rnb",
+      "Romance",
+      "Hip Hop"
+     ],
+     "langBoostValue": 41.58149614461991
+    },
+    {
+     "iid": "42697399",
+     "id": 42697399,
+     "ti": "Moth To A Flame",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/0wrb4N3Lg7/rb4qn8r7KL/size_m.jpg",
+     "sti": "Swedish House Mafia,The Weeknd",
+     "lang": [
+      "English"
+     ],
+     "seo": "moth-to-a-flame-65",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 103788.81,
+     "boostValue": 83.28828651751124,
+     "isPc": "0",
+     "alist": "[Swedish House Mafia,The Weeknd]",
+     "isrc": "USUG12105524",
+     "pw": 0,
+     "langBoostValue": 41.70559743027238
+    },
+    {
+     "iid": "79537967",
+     "id": 79537967,
+     "ti": "The Weekend",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/a7LWBaz3zX/LWBApaxN3z/size_m.jpg",
+     "sti": "Train",
+     "lang": [
+      "English"
+     ],
+     "seo": "the-weekend-9KNjQ9roKB",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 59410.87,
+     "boostValue": 40,
+     "isPc": "0",
+     "alist": "[Train]",
+     "isrc": "USSM12600214",
+     "pw": 0,
+     "langBoostValue": 19.468844711563154
+    },
+    {
+     "iid": "70534531",
+     "id": 70534531,
+     "ti": "The Weekend",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/z8k3yd1Krx/k3y7lB92br/size_m.jpg",
+     "sti": "Caroline Meek",
+     "lang": [
+      "English"
+     ],
+     "seo": "the-weekend-516",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 58501.418,
+     "boostValue": 39.441234248980045,
+     "isPc": "0",
+     "alist": "[Caroline Meek]",
+     "isrc": "QT65W2640480",
+     "pw": 0,
+     "langBoostValue": 19.181812425633144
+    },
+    {
+     "iid": "81816687",
+     "id": 81816687,
+     "ti": "The Weekend You Disappeared",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/d41WjnWPLq/1Wj0q08OKP/size_m.jpg",
+     "sti": "BSprod",
+     "lang": [
+      "English"
+     ],
+     "seo": "the-weekend-you-disappeared",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 51286.56,
+     "boostValue": 48.184839316032026,
+     "isPc": "0",
+     "alist": "[BSprod]",
+     "isrc": "GXLEU2613910",
+     "pw": 0,
+     "langBoostValue": 23.673313461772242
+    },
+    {
+     "iid": "53273917",
+     "id": 53273917,
+     "ti": "The Weekend Mashup 2",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/a7LWBzWzXA/LWBaAmVP3z/size_m.jpg",
+     "sti": "Ammy Virk,Dilraj Grewal,Raman Romana",
+     "lang": [
+      "Punjabi"
+     ],
+     "seo": "the-weekend-mashup-2",
+     "ty": "Track",
+     "language": "Punjabi",
+     "scoreF": 47400.457,
+     "boostValue": 65.6598370400778,
+     "isPc": "0",
+     "alist": "[Ammy Virk,Dilraj Grewal,Raman Romana]",
+     "isrc": "INS922300682",
+     "cat": "Love Story",
+     "pw": 0,
+     "tags": [
+      "Party",
+      "Happy",
+      "Chill",
+      "Romance"
+     ],
+     "langBoostValue": 31.34423367199813
+    },
+    {
+     "iid": "80871434",
+     "id": 80871434,
+     "ti": "The Weekend Starts Here",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/10q3Z1K52r/q3Z10eY6K5/size_m.jpg",
+     "sti": "Fatboy Slim",
+     "lang": [
+      "English"
+     ],
+     "seo": "the-weekend-starts-here-V3dpRa853R",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 42320.586,
+     "boostValue": 40,
+     "isPc": "0",
+     "alist": "[Fatboy Slim]",
+     "isrc": "GBBMQ9700031",
+     "pw": 0,
+     "langBoostValue": 19.468844711563154
+    },
+    {
+     "iid": "17784468",
+     "id": 17784468,
+     "ti": "Hymn for the Weekend (Seeb Remix)",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/9En3pqeWXD/En3pV9J4bX/size_m.jpg",
+     "sti": "Coldplay",
+     "lang": [
+      "English"
+     ],
+     "seo": "hymn-for-the-weekend-seeb-remix",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 36784.87,
+     "boostValue": 78.24371319098424,
+     "isPc": "0",
+     "alist": "[Coldplay]",
+     "isrc": "GBAYE1600763",
+     "pw": 0,
+     "tags": [
+      "Pop",
+      "Chill",
+      "Motivational",
+      "House",
+      "Remix"
+     ],
+     "langBoostValue": 39.1142513951735
+    },
+    {
+     "iid": "81347706",
+     "id": 81347706,
+     "ti": "Daydream for the Weekend",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/koMWQ7BKqL/MWQV8V0Pbq/size_m.jpg",
+     "sti": "Eva",
+     "lang": [
+      "English"
+     ],
+     "seo": "daydream-for-the-weekend",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 34949.42,
+     "boostValue": 49.75136693953267,
+     "isPc": "0",
+     "alist": "[Eva]",
+     "isrc": "GXLEZ2661196",
+     "pw": 0,
+     "langBoostValue": 24.47802277676718
+    },
+    {
+     "iid": "76930447",
+     "id": 76930447,
+     "ti": "When The Weekend Comes",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/9MAWe97WyJ/AWePX6Mw3y/size_m.jpg",
+     "sti": "Bobby Womack",
+     "lang": [
+      "English"
+     ],
+     "seo": "when-the-weekend-comes-0447-7693",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 30265.246,
+     "boostValue": 43.65328879867988,
+     "isPc": "0",
+     "alist": "[Bobby Womack]",
+     "isrc": "QZPL52601245",
+     "pw": 0,
+     "langBoostValue": 21.34550202839671
+    },
+    {
+     "iid": "81298079",
+     "id": 81298079,
+     "ti": "Come with Me on the Weekend",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/zLp36v3rGe/p36DZ6Mvbr/size_m.jpg",
+     "sti": "Lily",
+     "lang": [
+      "English"
+     ],
+     "seo": "come-with-me-on-the-weekend",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 29122.545,
+     "boostValue": 40,
+     "isPc": "0",
+     "alist": "[Lily]",
+     "isrc": "GXLEZ2648421",
+     "pw": 0,
+     "langBoostValue": 19.468844711563154
+    },
+    {
+     "iid": "81528917",
+     "id": 81528917,
+     "ti": "Firefly for the Weekend",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/Dk9KN2KBx1/9KNnZYG2KB/size_m.jpg",
+     "sti": "Eva",
+     "lang": [
+      "English"
+     ],
+     "seo": "firefly-for-the-weekend",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 28798.002,
+     "boostValue": 40,
+     "isPc": "0",
+     "alist": "[Eva]",
+     "isrc": "GXLEW2619013",
+     "pw": 0,
+     "langBoostValue": 19.468844711563154
+    },
+    {
+     "iid": "77372238",
+     "id": 77372238,
+     "ti": "The Empty Weekend",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/D0PKLqr3Gl/PKLzVzXpWG/size_m.jpg",
+     "sti": "12AM",
+     "lang": [
+      "English"
+     ],
+     "seo": "the-empty-weekend",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 28758.16,
+     "boostValue": 49.618090906158585,
+     "isPc": "0",
+     "alist": "[12AM]",
+     "isrc": "GBLFP2620411",
+     "pw": 0,
+     "langBoostValue": 24.409560233296645
+    },
+    {
+     "iid": "81114909",
+     "id": 81114909,
+     "ti": "Call Me On The Weekend",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/9MAWe97WyJ/AWePpw5z3y/size_m.jpg",
+     "sti": "Youth",
+     "lang": [
+      "English"
+     ],
+     "seo": "call-me-on-the-weekend-LWBP0lwJKz",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 28489.271,
+     "boostValue": 36.613708369483334,
+     "isPc": "0",
+     "alist": "[Youth]",
+     "isrc": "QT66A2643126",
+     "pw": 0,
+     "langBoostValue": 17.72934112574271
+    },
+    {
+     "iid": "81417910",
+     "id": 81417910,
+     "ti": "Daylight for the Weekend",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/Bp1bAynb02/1bAwVvBN30/size_m.jpg",
+     "sti": "Eva",
+     "lang": [
+      "English"
+     ],
+     "seo": "daylight-for-the-weekend",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 28142.883,
+     "boostValue": 40,
+     "isPc": "0",
+     "alist": "[Eva]",
+     "isrc": "GXLEZ2684331",
+     "pw": 0,
+     "langBoostValue": 19.468844711563154
+    },
+    {
+     "iid": "81513743",
+     "id": 81513743,
+     "ti": "Downtown for the Weekend",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/BZgWoQOK2d/gWoml4j7K2/size_m.jpg",
+     "sti": "Eva",
+     "lang": [
+      "English"
+     ],
+     "seo": "downtown-for-the-weekend",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 28136.875,
+     "boostValue": 40,
+     "isPc": "0",
+     "alist": "[Eva]",
+     "isrc": "GXLEW2601376",
+     "pw": 0,
+     "langBoostValue": 19.468844711563154
+    },
+    {
+     "iid": "81335945",
+     "id": 81335945,
+     "ti": "Day off for the Weekend",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/oAJbDElKnL/JbDDwLnBbn/size_m.jpg",
+     "sti": "Eva",
+     "lang": [
+      "English"
+     ],
+     "seo": "day-off-for-the-weekend",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 28075.23,
+     "boostValue": 40,
+     "isPc": "0",
+     "alist": "[Eva]",
+     "isrc": "GXLEZ2648062",
+     "pw": 0,
+     "langBoostValue": 19.468844711563154
+    },
+    {
+     "iid": "81737164",
+     "id": 81737164,
+     "ti": "Waiting for the Weekend",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/DwPKOBbqVZ/PKORA9LYbq/size_m.jpg",
+     "sti": "LOV",
+     "lang": [
+      "English"
+     ],
+     "seo": "waiting-for-the-weekend-qK5dw8jzbw",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 28006.18,
+     "boostValue": 40,
+     "isPc": "0",
+     "alist": "[LOV]",
+     "isrc": "GXLEW2691055",
+     "pw": 0,
+     "langBoostValue": 19.468844711563154
+    },
+    {
+     "iid": "81688798",
+     "id": 81688798,
+     "ti": "Ready for the Weekend",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/XYybzNrb2g/ybz2yxPmb2/size_m.jpg",
+     "sti": "LOV",
+     "lang": [
+      "English"
+     ],
+     "seo": "ready-for-the-weekend-PKOpPYZj3q",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 28006.18,
+     "boostValue": 40,
+     "isPc": "0",
+     "alist": "[LOV]",
+     "isrc": "GXLEW2656494",
+     "pw": 0,
+     "langBoostValue": 19.468844711563154
+    },
+    {
+     "iid": "82610298",
+     "id": 82610298,
+     "ti": "Kiss the Weekend",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/01A3mrWNQX/A3mmXBra3N/size_m.jpg",
+     "sti": "SONA PRASHANT",
+     "lang": [
+      "English"
+     ],
+     "seo": "kiss-the-weekend-PKO0xPjP3q",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 27801.223,
+     "boostValue": 40,
+     "isPc": "0",
+     "alist": "[SONA PRASHANT]",
+     "isrc": "INSN12636010",
+     "pw": 0,
+     "langBoostValue": 19.468844711563154
+    },
+    {
+     "iid": "80711696",
+     "id": 80711696,
+     "ti": "Hallelujah to the Weekend",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/JD2KJyAbOL/2KJ2noZlKO/size_m.jpg",
+     "sti": "DP MUSIC PRESENTS",
+     "lang": [
+      "English"
+     ],
+     "seo": "hallelujah-to-the-weekend",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 27732.385,
+     "boostValue": 40,
+     "isPc": "0",
+     "alist": "[DP MUSIC PRESENTS]",
+     "isrc": "GXLEL2631954",
+     "pw": 0,
+     "langBoostValue": 19.468844711563154
+    },
+    {
+     "iid": "81556949",
+     "id": 81556949,
+     "ti": "Bluebird for the Weekend",
+     "aw": "https://a10.gaanacdn.com/gn_img/albums/10q3ZR1352/q3Z1xMrNK5/size_m.jpg",
+     "sti": "Eva",
+     "lang": [
+      "English"
+     ],
+     "seo": "bluebird-for-the-weekend",
+     "ty": "Track",
+     "language": "English",
+     "scoreF": 27694.283,
+     "boostValue": 40,
+     "isPc": "0",
+     "alist": "[Eva]",
+     "isrc": "GXLEW2633678",
+     "pw": 0,
+     "langBoostValue": 19.468844711563154
+    }
+   ]
+  }
+ ]
+}

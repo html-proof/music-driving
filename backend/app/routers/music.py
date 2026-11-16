@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Header, Path, Query
 
@@ -47,11 +47,15 @@ async def home(
 @router.get("/search", response_model=SearchResults)
 async def search(
     db: DB, catalog: Catalog, user: OptionalUser,
-    q: Annotated[str, Query(min_length=1, max_length=200)],
+    q: Annotated[str, Query(min_length=1, max_length=200, description="Any script; Indic queries are also "
+                                                                       "searched in Latin transliteration")],
+    search_type: Annotated[Literal["all", "songs", "albums", "artists", "playlists"],
+                           Query(alias="type", description="Search one section, or all")] = "all",
+    page: Annotated[int, Query(ge=1, le=20)] = 1,
     limit: Annotated[int, Query(ge=1, le=30)] = 10,
     save: Annotated[bool, Query(description="Store in the user's search history")] = False,
 ) -> SearchResults:
-    results = await catalog.search(q, limit)
+    results = await catalog.search(q, limit, search_type, page)
     if save and user is not None:
         await LibraryService(db, catalog, user.id).record_search(q)
     return results

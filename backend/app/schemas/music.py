@@ -44,13 +44,17 @@ class Track(BaseModel):
     title: str
     artists: list[ArtistRef] = []
     album: AlbumRef | None = None
-    duration: int = Field(0, description="Seconds")
+    duration: int = Field(0, description="Seconds; 0 means unknown (list rows), not 0:00")
     language: str | None = None
     genres: list[str] = []
     is_explicit: bool = False
     release_date: str | None = None
     artwork: Artwork = Artwork()
-    playable: bool = Field(False, description="Provider returned a stream for this track")
+    playable: bool = Field(
+        True,
+        description="May be streamed: true unless the provider reports it unstreamable. The stream itself "
+                    "is resolved at play time via /playback/stream/{song_id}.",
+    )
     provider_url: str | None = None
 
 
@@ -113,13 +117,20 @@ class TrackPage(BaseModel):
 
 class SearchResults(BaseModel):
     query: str
+    type: str = Field("all", description="all | songs | albums | artists | playlists")
+    page: int = 1
+    alt_query: str | None = Field(
+        None, description="Latin transliteration of an Indic-script query, searched as well"
+    )
     songs: list[Track] = []
     albums: list[AlbumSummary] = []
     artists: list[ArtistSummary] = []
     playlists: list[PlaylistSummary] = []
     errors: dict[str, str] = Field(
-        default_factory=dict, description="Per-section provider failures (section -> message)"
+        default_factory=dict,
+        description="Per-section provider failures (section -> message); `query` when the query is empty",
     )
+    has_more: dict[str, bool] = Field(default_factory=dict, description="Section -> another page may exist")
 
 
 class HomeSection(BaseModel):
@@ -127,6 +138,7 @@ class HomeSection(BaseModel):
     title: str
     subtitle: str | None = None
     type: str = Field(description="tracks | albums | artists | playlists")
+    stale: bool = Field(False, description="Served from the last good copy: the provider is unavailable")
     tracks: list[Track] = []
     albums: list[AlbumSummary] = []
     artists: list[ArtistSummary] = []
@@ -141,6 +153,7 @@ class HomeFeed(BaseModel):
     # Languages whose songs could not be loaded right now (provider busy / blocking, and
     # no earlier copy to fall back on); the app tells the user instead of hiding them.
     unavailable_languages: list[str] = []
+    generated_at: datetime
 
 
 class NewReleases(BaseModel):

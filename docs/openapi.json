@@ -526,7 +526,40 @@
        "type": "string",
        "minLength": 1,
        "maxLength": 200,
+       "description": "Any script; Indic queries are also searched in Latin transliteration",
        "title": "Q"
+      },
+      "description": "Any script; Indic queries are also searched in Latin transliteration"
+     },
+     {
+      "name": "type",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "enum": [
+        "all",
+        "songs",
+        "albums",
+        "artists",
+        "playlists"
+       ],
+       "type": "string",
+       "description": "Search one section, or all",
+       "default": "all",
+       "title": "Type"
+      },
+      "description": "Search one section, or all"
+     },
+     {
+      "name": "page",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 20,
+       "minimum": 1,
+       "default": 1,
+       "title": "Page"
       }
      },
      {
@@ -684,7 +717,7 @@
        "type": "string",
        "minLength": 1,
        "maxLength": 20,
-       "pattern": "^[0-9]+$",
+       "pattern": "^[A-Za-z0-9]+$",
        "title": "Album Id"
       }
      },
@@ -807,7 +840,7 @@
        "type": "string",
        "minLength": 1,
        "maxLength": 20,
-       "pattern": "^[0-9]+$",
+       "pattern": "^[A-Za-z0-9]+$",
        "title": "Artist Id"
       }
      },
@@ -942,12 +975,20 @@
       "in": "query",
       "required": false,
       "schema": {
-       "type": "integer",
-       "maximum": 50,
-       "minimum": 1,
-       "default": 20,
+       "anyOf": [
+        {
+         "type": "integer",
+         "maximum": 50,
+         "minimum": 1
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Defaults to the home row size",
        "title": "Limit"
-      }
+      },
+      "description": "Defaults to the home row size"
      }
     ],
     "responses": {
@@ -1015,12 +1056,20 @@
       "in": "query",
       "required": false,
       "schema": {
-       "type": "integer",
-       "maximum": 50,
-       "minimum": 1,
-       "default": 20,
+       "anyOf": [
+        {
+         "type": "integer",
+         "maximum": 50,
+         "minimum": 1
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "Defaults to the home row size",
        "title": "Limit"
-      }
+      },
+      "description": "Defaults to the home row size"
      }
     ],
     "responses": {
@@ -1596,6 +1645,43 @@
         }
        }
       }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "library"
+    ],
+    "summary": "Record a search (e.g. when a result is tapped) without running it again",
+    "operationId": "record_search_api_v1_library_search_history_post",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SearchHistoryCreate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "204": {
+      "description": "Successful Response"
      },
      "422": {
       "description": "Validation Error",
@@ -3284,13 +3370,27 @@
       "type": "object",
       "title": "Errors",
       "default": {}
+     },
+     "unavailable_languages": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Unavailable Languages",
+      "default": []
+     },
+     "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Generated At"
      }
     },
     "type": "object",
     "required": [
      "greeting",
      "languages",
-     "sections"
+     "sections",
+     "generated_at"
     ],
     "title": "HomeFeed"
    },
@@ -3319,6 +3419,12 @@
       "type": "string",
       "title": "Type",
       "description": "tracks | albums | artists | playlists"
+     },
+     "stale": {
+      "type": "boolean",
+      "title": "Stale",
+      "description": "Served from the last good copy: the provider is unavailable",
+      "default": false
      },
      "tracks": {
       "items": {
@@ -4265,11 +4371,49 @@
     ],
     "title": "RefreshRequest"
    },
+   "SearchHistoryCreate": {
+    "properties": {
+     "query": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Query"
+     }
+    },
+    "type": "object",
+    "required": [
+     "query"
+    ],
+    "title": "SearchHistoryCreate"
+   },
    "SearchResults": {
     "properties": {
      "query": {
       "type": "string",
       "title": "Query"
+     },
+     "type": {
+      "type": "string",
+      "title": "Type",
+      "description": "all | songs | albums | artists | playlists",
+      "default": "all"
+     },
+     "page": {
+      "type": "integer",
+      "title": "Page",
+      "default": 1
+     },
+     "alt_query": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Alt Query",
+      "description": "Latin transliteration of an Indic-script query, searched as well"
      },
      "songs": {
       "items": {
@@ -4309,7 +4453,15 @@
       },
       "type": "object",
       "title": "Errors",
-      "description": "Per-section provider failures (section -> message)"
+      "description": "Per-section provider failures (section -> message); `query` when the query is empty"
+     },
+     "has_more": {
+      "additionalProperties": {
+       "type": "boolean"
+      },
+      "type": "object",
+      "title": "Has More",
+      "description": "Section -> another page may exist"
      }
     },
     "type": "object",
@@ -4447,7 +4599,7 @@
      "duration": {
       "type": "integer",
       "title": "Duration",
-      "description": "Seconds",
+      "description": "Seconds; 0 means unknown (list rows), not 0:00",
       "default": 0
      },
      "language": {
@@ -4492,8 +4644,8 @@
      "playable": {
       "type": "boolean",
       "title": "Playable",
-      "description": "Provider returned a stream for this track",
-      "default": false
+      "description": "May be streamed: true unless the provider reports it unstreamable. The stream itself is resolved at play time via /playback/stream/{song_id}.",
+      "default": true
      },
      "provider_url": {
       "anyOf": [

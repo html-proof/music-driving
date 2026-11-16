@@ -21,7 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.integrations.errors import ProviderError
-from app.models import FollowedArtist, LikedSong, ListeningHistory, Song, UserPreferences
+from app.models import Artist, FollowedArtist, LikedSong, ListeningHistory, Song, UserPreferences
 from app.schemas.music import Recommendation, Recommendations, Track
 from app.services.catalog_service import CatalogService
 
@@ -39,6 +39,9 @@ class RecommendationService:
         self.user_id = user_id
 
     async def _signals(self):
+        # Only the active provider's songs and artists: ids from another provider can't
+        # be looked up (or played) here.
+        provider = self.catalog.provider.name
         since = datetime.now(UTC) - timedelta(days=90)
         artist_w: Counter[tuple[str, str, str]] = Counter()  # (seokey, numeric_id, name)
         genres: Counter[str] = Counter()
@@ -49,7 +52,8 @@ class RecommendationService:
             await self.db.execute(
                 select(ListeningHistory, Song)
                 .join(Song, Song.id == ListeningHistory.song_id)
-                .where(ListeningHistory.user_id == self.user_id, ListeningHistory.played_at >= since)
+                .where(ListeningHistory.user_id == self.user_id, ListeningHistory.played_at >= since,
+                       Song.provider == provider)
             )
         ).all()
         recent_cutoff = datetime.now(UTC) - timedelta(days=7)
@@ -62,14 +66,22 @@ class RecommendationService:
 
         liked = (
             await self.db.scalars(
-                select(Song).join(LikedSong, LikedSong.song_id == Song.id).where(LikedSong.user_id == self.user_id)
+                select(Song)
+                .join(LikedSong, LikedSong.song_id == Song.id)
+                .where(LikedSong.user_id == self.user_id, Song.provider == provider)
             )
         ).all()
         for s in liked:
             self._add_song(s, 3.0, artist_w, genres, languages)
             exclude.add(s.provider_id)
 
-        followed = (await self.db.scalars(select(FollowedArtist).where(FollowedArtist.user_id == self.user_id))).all()
+        followed = (
+            await self.db.scalars(
+                select(FollowedArtist)
+                .join(Artist, Artist.id == FollowedArtist.artist_id)
+                .where(FollowedArtist.user_id == self.user_id, Artist.provider == provider)
+            )
+        ).all()
         for f in followed:
             artist_w[(f.artist.provider_id, f.artist.provider_numeric_id or "", f.artist.name)] += 4.0
 
@@ -116,6 +128,10 @@ class RecommendationService:
         for (reason, _), res in zip(jobs, results, strict=True):
             if isinstance(res, ProviderError):
                 log.info("recommendation source failed (%s): %s", reason, res)
+                continue
+            if isinstance(res, Exception):
+                # One broken source (bad provider data, a bug) must not sink the rest.
+                log.error("recommendation source failed (%s)", reason, exc_info=res)
                 continue
             if isinstance(res, BaseException):
                 raise res

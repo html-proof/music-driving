@@ -51,3 +51,17 @@ async def test_remove_and_reorder_keep_positions_contiguous(client):
     assert (await client.delete(f"{API}/playlists/{pid}/songs/tyler-herro-2", headers=h)).status_code == 404
     bad = await client.put(f"{API}/playlists/{pid}/order", headers=h, json={"song_ids": ["tyler-herro"]})
     assert bad.status_code == 422
+
+
+async def test_adding_listed_lite_songs_needs_no_song_lookups(client, fake_gaana):
+    # Search rows are lite (no streams, album or duration). Adding all of them to a
+    # playlist must reuse the listed metadata, not send one songDetail request per song.
+    h, pid = await _setup(client)
+    found = (await client.get(f"{API}/search", params={"q": "tum hi ho", "type": "songs", "limit": 20})).json()
+    ids = [s["id"] for s in found["songs"]]
+    assert len(ids) == 20
+    r = await client.post(f"{API}/playlists/{pid}/songs", headers=h, json={"song_ids": ids})
+    body = r.json()
+    assert body["added"] == ids and body["failed"] == {}
+    assert body["playlist"]["tracks"][0]["track"]["title"] == found["songs"][0]["title"]
+    assert "/songs/info/" not in fake_gaana.calls

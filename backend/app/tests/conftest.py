@@ -3,6 +3,9 @@
 * The music provider is the real GaanaPy client + normaliser, wired to an httpx
   MockTransport that replays responses recorded from a live GaanaPy instance
   (app/tests/fixtures). Stream-token expiry is rewritten to "now + 4h" on replay.
+* fixtures/gaana_raw holds raw Gaana search responses recorded live; `lite_song_rows`
+  turns them into GaanaPy's lite search rows exactly as the GaanaPy contract (A3)
+  specifies, so search / list tests run on real catalogue data.
 * Database: SQLite by default; set TEST_DATABASE_URL to run against PostgreSQL.
 * Live provider tests (tests/test_live_provider.py) only run with LIVE_PROVIDER=1.
 """
@@ -34,6 +37,9 @@ from app.services.lyrics_service import LyricsService  # noqa: E402
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
+RAW = FIXTURES / "gaana_raw"
+_SIZE_TOKEN = re.compile(r"size_[sml](?=[_.])")
+
 ROUTES = {
     ("/songs/search/", "tyler herro"): "songs_search_tyler_herro",
     ("/songs/info/", "tyler-herro"): "songs_info_tyler_herro",
@@ -48,6 +54,49 @@ ROUTES = {
     ("/charts", None): "charts",
     ("/playlists/info/", "gaana-dj-hindi-top-50-1"): "playlist_hindi_top_50",
 }
+
+
+# GaanaPy lite rows built from a recorded raw Gaana search: (path, key) -> (raw file, language or None).
+LITE_ROUTES = {
+    ("/songs/search/", "tum hi ho"): ("search_tum_hi_ho", None),
+    ("/songs/search/", "malare"): ("search_malare", None),
+    ("/songs/search/", "the weeknd"): ("search_the_weeknd", None),
+    ("/trending", "Hindi"): ("search_tum_hi_ho", "Hindi"),
+    ("/trending", "Tamil"): ("search_malare", "Tamil"),
+}
+# One-row artist search by name (Home's popular artists).
+ROUTES[("/artists/search/", "arijit singh")] = "artists_search_arijit"
+# GaanaPy's error bodies (contract A1).
+FAILURES = {
+    "blocked": (503, {"error": "blocked", "upstream_status": 403, "retry_after": 120}),
+    "unavailable": (502, {"error": "upstream_unavailable", "detail": "ReadTimeout"}),
+    "internal": (500, {"error": "internal", "detail": "KeyError"}),
+}
+
+
+def _artwork(aw: str) -> dict:
+    return {"urls": {f"{size}_artwork": _SIZE_TOKEN.sub(f"size_{size[0]}", aw) if aw else ""
+                     for size in ("small", "medium", "large")}}
+
+
+def lite_song_row(gd: dict) -> dict:
+    """A GaanaPy lite song row, built from one raw Gaana search item (contract A3)."""
+    names = gd.get("sti") or (gd.get("alist") or "").strip("[]")
+    lang = gd.get("language") or ((gd.get("lang") or [""])[0])
+    return {
+        "seokey": gd["seo"], "track_id": str(gd["id"]), "title": gd["ti"],
+        "artists": ", ".join(n.strip() for n in names.split(",") if n.strip()),
+        "artist_seokeys": "", "artist_ids": "", "album": "", "album_seokey": "", "album_id": "",
+        "duration": "", "language": lang, "images": _artwork(gd.get("aw") or ""),
+        "stream_urls": {"urls": {}}, "lite": True,
+    }
+
+
+def lite_song_rows(name: str, language: str | None = None) -> list[dict]:
+    raw = json.loads((RAW / f"{name}.json").read_text(encoding="utf-8"))
+    items = [gd for group in raw["gr"] if group.get("ty") == "Track" for gd in group["gd"]]
+    rows = [lite_song_row(gd) for gd in items]
+    return [r for r in rows if language is None or r["language"] == language]
 
 
 def _load(name: str):
@@ -80,23 +129,54 @@ class FakeGaanaPy:
 
     def __init__(self):
         self.calls: list[str] = []
-        self.down = False
+        self.requests: list[tuple[str, dict]] = []  # (path, query params) of every call
+        # Every request fails like this ("blocked", "unavailable", "internal"; see FAILURES).
+        self.failure: str | None = None
+        # Only matching requests fail: (path, key) -> FAILURES name, or an HTTP status.
+        self.fail: dict[tuple[str, str], str | int] = {}
         self.tracks = _all_tracks()
+
+    @property
+    def down(self) -> bool:
+        """Gaana is blocking us (GaanaPy answers 503 "blocked")."""
+        return self.failure == "blocked"
+
+    @down.setter
+    def down(self, value: bool) -> None:
+        self.failure = "blocked" if value else None
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         path = request.url.path
+        p = request.url.params
         self.calls.append(path)
-        if self.down:
-            return httpx.Response(502, json={"error": "Upstream data source error"})
+        self.requests.append((path, dict(p)))
+        if self.failure:
+            status, body = FAILURES[self.failure]
+            return httpx.Response(status, json=body)
         if path == "/health":
             return httpx.Response(200, json={"status": "ok"})
-        p = request.url.params
         key = p.get("query") or p.get("seokey") or p.get("artist_id") or p.get("album_id") or p.get("language")
         if p.get("query"):
             key = key.lower()  # Gaana search is case-insensitive
-        name = ROUTES.get((path, key))
-        if name:
-            return httpx.Response(200, json=_load(name))
+        failure = self.fail.get((path, key))
+        if failure is not None:
+            status, body = FAILURES[failure] if isinstance(failure, str) else (failure, {"detail": "rejected"})
+            return httpx.Response(status, json=body)
+        rows = None
+        if (path, key) in LITE_ROUTES:
+            rows = lite_song_rows(*LITE_ROUTES[(path, key)])
+        elif name := ROUTES.get((path, key)):
+            rows = _load(name)
+        if rows is not None and path.endswith("/search/"):
+            # GaanaPy slices search pages out of Gaana's first result page (contract A2).
+            limit, page = int(p.get("limit", 10)), int(p.get("page", 1))
+            rows = rows[(page - 1) * limit: page * limit]
+            if not rows:
+                return httpx.Response(404, json={"detail": "Unable to find any results!"})
+        elif rows is not None and path == "/trending" and isinstance(rows, list):
+            rows = rows[: int(p.get("limit", len(rows)))]
+        if rows is not None:
+            return httpx.Response(200, json=rows)
         if path == "/songs/info/" and key in self.tracks:
             return httpx.Response(200, json=[self.tracks[key]])
         return httpx.Response(404, json={"detail": "Unable to find any results!"})

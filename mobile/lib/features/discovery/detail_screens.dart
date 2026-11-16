@@ -12,10 +12,20 @@ import '../../widgets/track_tile.dart';
 import '../library/library_providers.dart';
 import '../playlists/add_to_playlist_sheet.dart';
 
-final albumProvider = FutureProvider.family<AlbumDetail, String>((ref, id) => ref.read(musicRepositoryProvider).album(id));
-final artistProvider = FutureProvider.family<ArtistDetail, String>((ref, id) => ref.read(musicRepositoryProvider).artist(id));
-final providerPlaylistProvider =
-    FutureProvider.family<PlaylistDetail, String>((ref, id) => ref.read(musicRepositoryProvider).playlist(id));
+// No automatic retries: a failure is almost always the provider being down or blocking
+// us, and Riverpod's default backoff would keep hammering it. The screens offer "Try again".
+final albumProvider = FutureProvider.family<AlbumDetail, String>(
+  (ref, id) => ref.read(musicRepositoryProvider).album(id),
+  retry: (_, _) => null,
+);
+final artistProvider = FutureProvider.family<ArtistDetail, String>(
+  (ref, id) => ref.read(musicRepositoryProvider).artist(id),
+  retry: (_, _) => null,
+);
+final providerPlaylistProvider = FutureProvider.family<PlaylistDetail, String>(
+  (ref, id) => ref.read(musicRepositoryProvider).playlist(id),
+  retry: (_, _) => null,
+);
 
 /// Shared header + track list layout for albums and playlists.
 class CollectionView extends ConsumerWidget {

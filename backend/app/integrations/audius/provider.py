@@ -152,18 +152,30 @@ class AudiusProvider:
         return tracks
 
     # --- search -------------------------------------------------------------------
-    async def search_songs(self, query: str, limit: int) -> list[Track]:
+    # Only the first page is served: Audius search paging is not wired up here, so later
+    # pages are empty (no request) and the backend reports has_more = false.
+    paged_search = False
+
+    async def search_songs(self, query: str, limit: int, page: int = 1) -> list[Track]:
+        if page > 1:
+            return []
         return self._tracks(await self.client.search_tracks(query, limit))
 
-    async def search_albums(self, query: str, limit: int) -> list[AlbumSummary]:
+    async def search_albums(self, query: str, limit: int, page: int = 1) -> list[AlbumSummary]:
+        if page > 1:
+            return []
         # Albums are playlists flagged is_album; over-fetch, then filter.
         rows = await self.client.search_playlists(query, min(limit * 3, 100))
         return [n.album_summary(r) for r in rows if r.get("is_album")][:limit]
 
-    async def search_artists(self, query: str, limit: int) -> list[ArtistSummary]:
+    async def search_artists(self, query: str, limit: int, page: int = 1) -> list[ArtistSummary]:
+        if page > 1:
+            return []
         return [n.artist_summary(u) for u in await self.client.search_users(query, limit)]
 
-    async def search_playlists(self, query: str, limit: int) -> list[PlaylistSummary]:
+    async def search_playlists(self, query: str, limit: int, page: int = 1) -> list[PlaylistSummary]:
+        if page > 1:
+            return []
         rows = await self.client.search_playlists(query, min(limit * 2, 100))
         return [n.playlist_summary(r) for r in rows if not r.get("is_album")][:limit]
 

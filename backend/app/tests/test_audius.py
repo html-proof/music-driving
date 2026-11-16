@@ -155,18 +155,20 @@ async def test_home_has_a_row_per_language(audius_client, fake_audius):
     assert feed["sections"][0]["id"] == "trending_hindi"
     # Matching, playable songs only, most played first, each once.
     assert [t["id"] for t in rows["trending_hindi"]["tracks"]] == ["h1", "h3", "h2"]
-    assert rows["trending_hindi"]["subtitle"] == "Hindi"
+    assert rows["trending_hindi"]["title"] == "Trending in Hindi"
     assert [t["id"] for t in rows["trending_tamil"]["tracks"]] == ["t1"]
-    assert rows["trending_tamil"]["title"] == "Popular in Tamil"
-    assert rows["trending_tamil"]["subtitle"] == "Regional picks"
-    # English: Audius's all-genre trending, titled sensibly when it isn't the first row.
-    assert rows["trending_all"]["title"] == "Trending worldwide"
-    assert rows["trending_all"]["subtitle"] is None
-    assert rows["trending_all"]["tracks"][0]["id"] == TRACK_ID
-    # Audius's albums / underground rows are global, so they don't claim the first language.
-    assert rows["new_albums"]["subtitle"] is None and rows["new_tracks"]["subtitle"] is None
+    assert rows["trending_tamil"]["title"] == "Trending in Tamil"
+    # English: Audius's all-genre trending is the international row.
+    assert rows["international_hits"]["title"] == "International hits"
+    assert rows["international_hits"]["subtitle"] is None
+    assert rows["international_hits"]["tracks"][0]["id"] == TRACK_ID
+    # Audius's albums / underground rows are global: one pair, not claimed by a language.
+    assert rows["new_albums_english"]["subtitle"] is None and rows["new_tracks_english"]["subtitle"] is None
+    assert not any(k.startswith("new_") and k.endswith("_hindi") for k in rows)
     searches = [c.url.params for c in f.calls if c.url.path == "/v1/tracks/search"]
-    assert {p["query"] for p in searches} == {"hindi", "bollywood", "tamil", "kollywood"}
+    # The user's languages plus the other Home languages (Malayalam, Telugu, Punjabi).
+    assert {p["query"] for p in searches} == {"hindi", "bollywood", "tamil", "kollywood", "malayalam", "mollywood",
+                                              "telugu", "tollywood", "punjabi", "bhangra"}
     assert all(p["sort_method"] == "popular" for p in searches)
     assert feed["unavailable_languages"] == []
 
@@ -179,19 +181,18 @@ async def test_trending_endpoint_serves_a_language(audius_client, fake_audius):
     assert [t["id"] for t in r.json()] == ["p1"]
 
 
-async def test_home_uses_one_all_genre_feed_without_known_languages(audius_client, fake_audius):
+async def test_home_english_is_the_all_genre_international_row(audius_client, fake_audius):
     r = await audius_client.get(f"{API}/home", params={"languages": "English"})
     assert r.status_code == 200, r.text
     feed = r.json()
     titles = [s["title"] for s in feed["sections"]]
-    assert titles.count("Trending now") == 1 and not any(t.startswith("Popular in") for t in titles)
+    assert titles.count("International hits") == 1
     assert {"Top albums", "Fresh & underground", "Trending playlists"} <= set(titles)
-    assert feed["languages"] == ["English"]
+    assert feed["languages"] == ["Hindi", "Malayalam", "Tamil", "Telugu", "Punjabi", "English"]
     trending_calls = [c for c in fake_audius.calls if c.url.path == "/v1/tracks/trending"]
     assert trending_calls and all("genre" not in c.url.params for c in trending_calls)
-    assert "/tracks/search" not in fake_audius.paths()
-    first = feed["sections"][0]
-    assert first["subtitle"] is None and first["tracks"][0]["id"] == TRACK_ID
+    row = next(s for s in feed["sections"] if s["id"] == "international_hits")
+    assert row["subtitle"] is None and row["tracks"][0]["id"] == TRACK_ID
 
 
 async def test_home_filters_by_a_language_that_names_a_genre(audius_client, fake_audius):
@@ -199,7 +200,9 @@ async def test_home_filters_by_a_language_that_names_a_genre(audius_client, fake
     assert feed["sections"][0]["id"] == "trending_jazz"
     genres = {c.url.params.get("genre") for c in fake_audius.calls if c.url.path == "/v1/tracks/trending"}
     assert genres == {"Jazz", None}  # English adds the all-genre row
-    assert [s["id"] for s in feed["sections"] if s["id"].startswith("trending_")] == ["trending_jazz", "trending_all"]
+    ids = [s["id"] for s in feed["sections"]]
+    assert [i for i in ids if i.startswith("trending_")] == ["trending_jazz"]
+    assert "international_hits" in ids
 
 
 async def test_stream_is_a_progressive_mp3_without_hls_check(audius_client, fake_audius):
@@ -230,6 +233,15 @@ async def test_search_uses_audius_playlist_search(audius_client, fake_audius):
     assert r["songs"] and r["artists"] and r["playlists"]
     assert "/playlists/search" in fake_audius.paths()
     assert "/playlists/trending" not in fake_audius.paths()  # no chart-title matching fallback
+
+
+async def test_search_serves_only_the_first_page(audius_client, fake_audius):
+    first = (await audius_client.get(f"{API}/search", params={"q": "chill", "type": "songs", "limit": 2})).json()
+    assert first["songs"] and first["has_more"] == {"songs": False}  # Audius search paging isn't wired up
+    before = len(fake_audius.calls)
+    second = (await audius_client.get(f"{API}/search", params={"q": "chill", "type": "songs", "page": 2})).json()
+    assert second["songs"] == [] and second["errors"] == {} and second["has_more"] == {"songs": False}
+    assert len(fake_audius.calls) == before
 
 
 async def test_hash_ids_work_for_artist_and_playlist_routes(audius_client):

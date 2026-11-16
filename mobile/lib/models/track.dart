@@ -71,7 +71,8 @@ class Track {
   final String title;
   final List<ArtistRef> artists;
   final AlbumRef? album;
-  final int duration; // seconds
+  /// Seconds; 0 means unknown (search/list rows often carry no duration), never 0:00.
+  final int duration;
   final String? language;
   final List<String> genres;
   final bool isExplicit;
@@ -81,6 +82,7 @@ class Track {
 
   String get artistNames => artists.map((a) => a.name).join(', ');
   Duration get durationValue => Duration(seconds: duration);
+  bool get hasDuration => duration > 0;
 
   factory Track.fromJson(Map<String, dynamic> json) => Track(
         id: json['id'] as String,

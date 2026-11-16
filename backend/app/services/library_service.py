@@ -16,7 +16,7 @@ from app.schemas.library import (
     LikedSongOut,
 )
 from app.schemas.music import ArtistSummary, Track
-from app.services.catalog_service import CatalogService
+from app.services.catalog_service import CatalogService, sanitize_query
 
 
 async def ensure_song(db: AsyncSession, catalog: CatalogService, song_id: str) -> Song:
@@ -30,6 +30,10 @@ class LibraryService:
         self.db = db
         self.catalog = catalog
         self.user_id = user_id
+
+    @property
+    def _provider(self) -> str:
+        return self.catalog.provider.name
 
     # --- likes ---------------------------------------------------------------
     async def like(self, song_id: str) -> None:
@@ -59,7 +63,8 @@ class LibraryService:
             )
         ).all()
         return LikedPage(
-            items=[LikedSongOut(track=catalog_repo.song_to_track(r.song), liked_at=r.created_at) for r in rows],
+            items=[LikedSongOut(track=catalog_repo.song_to_track(r.song, self._provider), liked_at=r.created_at)
+                   for r in rows],
             total=total or 0,
             offset=offset,
             limit=limit,
@@ -127,7 +132,7 @@ class LibraryService:
         items = [
             HistoryEntry(
                 id=r.id,
-                track=catalog_repo.song_to_track(r.song),
+                track=catalog_repo.song_to_track(r.song, self._provider),
                 played_at=r.played_at,
                 seconds_listened=r.seconds_listened,
                 completed=r.completed,
@@ -138,7 +143,8 @@ class LibraryService:
         return HistoryPage(items=items, offset=offset, limit=limit, has_more=len(rows) > limit)
 
     async def recently_played(self, limit: int = 20) -> list[Track]:
-        """Distinct songs, most recent play first."""
+        """Distinct songs of the active provider, most recent play first (songs played
+        with another provider can't be streamed now, so they are left out)."""
         last_play = func.max(ListeningHistory.played_at).label("last_play")
         sub = (
             select(ListeningHistory.song_id, last_play)
@@ -148,10 +154,14 @@ class LibraryService:
         )
         rows = (
             await self.db.execute(
-                select(Song).join(sub, sub.c.song_id == Song.id).order_by(sub.c.last_play.desc()).limit(limit)
+                select(Song)
+                .join(sub, sub.c.song_id == Song.id)
+                .where(Song.provider == self._provider)
+                .order_by(sub.c.last_play.desc())
+                .limit(limit)
             )
         ).scalars().all()
-        return [catalog_repo.song_to_track(s) for s in rows]
+        return [catalog_repo.song_to_track(s, self._provider) for s in rows]
 
     async def clear_history(self) -> None:
         await self.db.execute(delete(ListeningHistory).where(ListeningHistory.user_id == self.user_id))
@@ -159,7 +169,7 @@ class LibraryService:
 
     # --- search history ------------------------------------------------------
     async def record_search(self, query: str) -> None:
-        query = query.strip()[:200]
+        query = sanitize_query(query)
         if not query:
             return
         await self.db.execute(

@@ -34,26 +34,39 @@ class Settings(BaseSettings):
     cors_origins: str = "*"
 
     # Music provider: "audius" (public Audius API, artist-uploaded music) or "gaana"
-    # (the GaanaPy service; Gaana blocks many hosting IPs).
+    # (the GaanaPy service; Gaana blocks many hosting IPs). Indian film / label and
+    # international catalogue (e.g. "Tum Hi Ho", "Taylor Swift") is only on Gaana: set
+    # MUSIC_PROVIDER=gaana for it.
     music_provider: Literal["audius", "gaana"] = "audius"
     audius_base_url: str = "https://api.audius.co/v1"
     # Audius asks every client to identify itself with an app name.
     audius_app_name: str = "Melodia"
     gaanapy_base_url: str = "http://localhost:8001"
     provider_timeout_seconds: float = 30.0
-    # Retries only cover GaanaPy itself being unreachable. When Gaana refuses a request
-    # (block / rate limit), retrying just prolongs the block, so the client backs off
-    # instead: no Gaana calls for the cooldown, doubling on each repeat up to the max.
+    # Retries only cover GaanaPy itself being unreachable (connect errors; never read
+    # timeouts). When Gaana refuses a request (GaanaPy answers 503 "blocked"), retrying
+    # just prolongs the block, so the client backs off instead: no Gaana calls for the
+    # cooldown (at least GaanaPy's retry_after), doubling on each repeat up to the max.
     provider_retries: int = 2
     provider_block_cooldown_seconds: int = 60
     provider_block_cooldown_max_seconds: int = 600
     catalog_cache_ttl_seconds: int = 900
     search_cache_ttl_seconds: int = 300
+    # Each search section (songs, albums, ...) gets this long; a slow one is reported in
+    # `errors` while the others are returned.
+    search_section_timeout_seconds: float = 10.0
     # Home lists (trending, new releases, charts) change slowly; each refresh costs one
     # Gaana request per song, so keep them longer and show fewer songs per row.
     home_cache_ttl_seconds: int = 3600
     home_section_size: int = 12
     home_artist_count: int = 4
+    # Home shows a "Trending in <language>" row for the user's languages first, then for
+    # these (up to 6 rows), plus "International hits" in `international_language`.
+    home_languages: str = "Hindi,Malayalam,Tamil,Telugu,Punjabi"
+    international_language: str = "English"
+    # Deadline for each Home provider row; a late row falls back to its last good copy
+    # (marked stale) or is reported in `errors`.
+    home_section_timeout_seconds: float = 12.0
     # Song/artist metadata rarely changes; long-lived so lyrics and artist cards never
     # need a fresh Gaana lookup.
     metadata_cache_ttl_seconds: int = 86400
@@ -79,6 +92,10 @@ class Settings(BaseSettings):
     @property
     def default_language_list(self) -> list[str]:
         return [lang.strip() for lang in self.default_languages.split(",") if lang.strip()]
+
+    @property
+    def home_language_list(self) -> list[str]:
+        return [lang.strip().title() for lang in self.home_languages.split(",") if lang.strip()]
 
     @property
     def is_sqlite(self) -> bool:

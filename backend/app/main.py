@@ -11,7 +11,7 @@ from app.config import Settings, get_settings
 from app.database import dispose_engine, get_engine, init_engine
 from app.integrations.audius.client import AudiusClient
 from app.integrations.audius.provider import AudiusProvider
-from app.integrations.errors import ProviderNotFound, ProviderUnavailable
+from app.integrations.errors import ProviderError, ProviderNotFound, ProviderUnavailable
 from app.integrations.gaanapy.client import GaanaPyClient
 from app.integrations.gaanapy.provider import GaanaProvider
 from app.middleware.request_context import RequestContextMiddleware
@@ -95,6 +95,12 @@ def create_app(settings: Settings | None = None, provider=None, lyrics: LyricsSe
         logging.getLogger("app.provider").warning("provider unavailable: %s", exc)
         return JSONResponse(status_code=503, content={"detail": "Music provider is currently unavailable"},
                             headers={"Retry-After": "30"})
+
+    @app.exception_handler(ProviderError)
+    async def _provider_error(_: Request, exc: ProviderError):
+        # Neither "not found" nor "unavailable": the provider failed internally.
+        logging.getLogger("app.provider").error("provider error: %s", exc)
+        return JSONResponse(status_code=502, content={"detail": "Music provider error"})
 
     @app.get("/health", tags=["health"])
     async def health() -> dict:

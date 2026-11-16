@@ -23,9 +23,10 @@ class GaanaProvider:
 
     def __init__(self, client: GaanaPyClient, remember: int = 3000):
         self.client = client
-        # GaanaPy builds every list (trending, search, albums, top tracks, playlists)
-        # from full song-detail records, stream URLs included. Remembering them means
-        # playing a listed song needs no second song lookup on Gaana.
+        # Every song row a list or search returned. Records from songDetail carry stream
+        # URLs, so playing a listed song needs no second song lookup on Gaana. Lite rows
+        # (search, most lists) carry none (their stream is resolved at play time) but
+        # still answer metadata lookups (playlist adds, queues, lyrics) without one.
         self._seen: OrderedDict[str, dict] = OrderedDict()
         self._remember_max = remember
 
@@ -37,14 +38,17 @@ class GaanaProvider:
         return ProviderTrack(n.track(raw), n.stream_urls(raw)) if raw else None
 
     def _harvest(self, payload: Any) -> Any:
-        """Remember every song record (with streams) found anywhere in a GaanaPy payload."""
+        """Remember every song record found anywhere in a GaanaPy payload. A row without
+        stream URLs never replaces one that has them."""
         stack = [payload]
         while stack:
             item = stack.pop()
             if isinstance(item, dict):
                 seo = item.get("seokey")
-                if isinstance(seo, str) and n.stream_urls(item):
-                    self._seen[seo] = item
+                if isinstance(seo, str) and seo and _is_song_row(item):
+                    known = self._seen.get(seo)
+                    if n.stream_urls(item) or known is None or not n.stream_urls(known):
+                        self._seen[seo] = item
                     self._seen.move_to_end(seo)
                 stack.extend(v for v in item.values() if isinstance(v, (dict, list)))
             elif isinstance(item, list):
@@ -53,14 +57,19 @@ class GaanaProvider:
             self._seen.popitem(last=False)
         return payload
 
-    async def search_songs(self, query: str, limit: int) -> list[Track]:
-        return [n.track(r) for r in n.records(self._harvest(await self.client.search_songs(query, limit)))]
+    # Search rows are "lite" (built by GaanaPy from Gaana's search list in one request):
+    # no stream URLs, album or duration; the stream is resolved when the song is played.
+    async def search_songs(self, query: str, limit: int, page: int = 1) -> list[Track]:
+        rows = n.records(self._harvest(await self.client.search_songs(query, limit, page)))
+        return [n.track(r) for r in rows][:limit]
 
-    async def search_albums(self, query: str, limit: int) -> list[AlbumSummary]:
-        return [n.album_summary(r) for r in n.records(self._harvest(await self.client.search_albums(query, limit)))]
+    async def search_albums(self, query: str, limit: int, page: int = 1) -> list[AlbumSummary]:
+        rows = n.records(self._harvest(await self.client.search_albums(query, limit, page)))
+        return [n.album_summary(r) for r in rows][:limit]
 
-    async def search_artists(self, query: str, limit: int) -> list[ArtistSummary]:
-        return [n.artist_summary(r) for r in n.records(self._harvest(await self.client.search_artists(query, limit)))]
+    async def search_artists(self, query: str, limit: int, page: int = 1) -> list[ArtistSummary]:
+        rows = n.records(self._harvest(await self.client.search_artists(query, limit, page)))
+        return [n.artist_summary(r) for r in rows][:limit]
 
     async def get_song(self, song_id: str) -> ProviderTrack:
         rows = n.records(self._harvest(await self.client.song_info(song_id)))
@@ -116,3 +125,9 @@ class GaanaProvider:
             raise ProviderNotFound(f"Playlist {playlist_id} not found")
         # GaanaPy only returns the tracks; metadata is filled in by the catalog service.
         return PlaylistDetail(id=playlist_id, title=playlist_id.replace("-", " ").title(), tracks=tracks)
+
+
+def _is_song_row(item: dict) -> bool:
+    """Song rows (songDetail records and lite rows) carry `track_id` and `stream_urls`;
+    album, artist and playlist rows do not."""
+    return "track_id" in item and "stream_urls" in item

@@ -37,10 +37,11 @@ async def test_search_aggregates_sections(client):
     assert body["errors"] == {}
 
 
-async def test_search_strips_unsupported_characters(client, fake_gaana):
-    r = await client.get(f"{API}/search", params={"q": "tyler   herro!!"})
+async def test_search_cleans_whitespace_and_control_characters(client, fake_gaana):
+    r = await client.get(f"{API}/search", params={"q": "  tyler \t  herro\x00 "})
     assert r.status_code == 200
     assert r.json()["songs"][0]["id"] == "tyler-herro"
+    assert ("/songs/search/", {"query": "tyler herro", "limit": "10", "page": "1"}) in fake_gaana.requests
 
 
 async def test_search_reports_provider_outage_per_section(client, fake_gaana):
@@ -101,9 +102,19 @@ async def test_home_feed_real_sections(client):
     assert r.status_code == 200
     home = r.json()
     ids = [s["id"] for s in home["sections"]]
-    assert ids[0] == "trending_english"
-    assert "new_albums" in ids and "charts" in ids
+    # English is the international row; the configured Indian languages get their own rows.
+    assert ids[0] == "trending_hindi"
+    # (the recorded English new releases have albums but no tracks)
+    assert {"international_hits", "new_albums_english", "charts"} <= set(ids)
+    assert "trending_tamil" in ids
+    rows = {s["id"]: s for s in home["sections"]}
+    assert rows["trending_hindi"]["title"] == "Trending in Hindi"
+    assert rows["international_hits"]["title"] == "International hits"
+    assert rows["charts"]["title"] == "Top charts"
+    assert not any(s["stale"] for s in home["sections"])
+    assert home["languages"] == ["Hindi", "Malayalam", "Tamil", "Telugu", "Punjabi", "English"]
     assert home["greeting"].startswith("Good")
+    assert home["generated_at"]
 
 
 async def test_home_includes_recently_played_for_user(client):

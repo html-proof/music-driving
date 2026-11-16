@@ -3,8 +3,10 @@ from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from api.gaanapy import GaanaPy
+from api.errors import BlockedError, UpstreamError
 from typing import Optional
 import re
+import unicodedata
 
 app = FastAPI()
 
@@ -21,12 +23,33 @@ async def health():
     return {"status": "ok"}
 
 
+# Callers must be able to tell a Gaana block (back off) from an outage (retry later) and
+# from a bug in GaanaPy (don't blame Gaana), so each gets its own status and body.
+@app.exception_handler(BlockedError)
+async def blocked_handler(request: Request, exc: BlockedError):
+    return JSONResponse(
+        status_code=503,
+        content={"error": "blocked", "upstream_status": exc.status, "retry_after": exc.retry_after},
+        headers={"Retry-After": str(exc.retry_after)},
+    )
+
+
+@app.exception_handler(UpstreamError)
+async def upstream_unavailable_handler(request: Request, exc: UpstreamError):
+    return JSONResponse(
+        status_code=502,
+        content={"error": "upstream_unavailable", "detail": str(exc)[:200]},
+    )
+
+
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
-        status_code=502,
-        content={"error": f"Upstream data source error: {type(exc).__name__}"}
+        status_code=500,
+        content={"error": "internal", "detail": type(exc).__name__},
     )
+
+
 gaanapy = None
 
 # Constants
@@ -36,17 +59,44 @@ DEFAULT_LIMIT = 10
 MIN_PAGE = 1
 DEFAULT_PAGE = 1
 MAX_PAGE = 1000
+MAX_SEARCH_PAGE = 20        # search pages are sliced from Gaana's first result page
+DEFAULT_PLAYLIST_LIMIT = 50
 
 MAX_QUERY_LENGTH = 200
 MAX_SEOKEY_LENGTH = 200
 MAX_ARTIST_ID_LENGTH = 20   
 MAX_LANGUAGE_LENGTH = 50
 
-SEO_KEY_BASE_PATTERN = r"^[a-z0-9\-]+$"                        # only lowercase, digits, hyphens
+SEO_KEY_BASE_PATTERN = r"^[A-Za-z0-9\-]+$"                     # letters, digits, hyphens (Gaana seokeys
+                                                                  # can be mixed case: tum-hi-ho-MWQM71XEWq)
 ARTIST_ID_PATTERN = r"^[0-9]+$"                                 # only digits
 LANGUAGE_PATTERN = r"^[a-zA-Z]+(?:\s[a-zA-Z]+)*$"                # letters and single internal spaces,
                                                                   # no leading/trailing/blank-only input
-SEARCH_QUERY_PATTERN = r"^[a-zA-Z0-9\s\-'.&]+$"
+
+
+def clean_search_query(value: str) -> str:
+    """Any language or script is allowed: drop control characters, collapse whitespace."""
+    value = unicodedata.normalize("NFC", value)
+    value = "".join(" " if unicodedata.category(ch) in ("Cc", "Cs") else ch for ch in value)
+    return " ".join(value.split())
+
+
+def search_query(
+    query: str = Query(..., min_length=1, max_length=MAX_QUERY_LENGTH,
+                       description="Text to search for, in any language or script."),
+) -> str:
+    cleaned = clean_search_query(query)
+    if not cleaned:
+        raise HTTPException(status_code=422, detail="query must contain at least one visible character")
+    return cleaned
+
+
+def search_page(
+    page: Optional[int] = Query(DEFAULT_PAGE, ge=MIN_PAGE, le=MAX_SEARCH_PAGE,
+                                description="Page of results (1-based)."),
+) -> int:
+    return page
+
 
 # Custom validator for seokey
 def validate_seokey(
@@ -78,12 +128,11 @@ async def home():
 
 @app.get("/songs/search/", summary="Search for songs.")
 async def songs_search(
-    query: str = Query(..., min_length=1, max_length=MAX_QUERY_LENGTH,
-                       pattern=SEARCH_QUERY_PATTERN,
-                       description="Name of the song to search for."),
-    limit: Optional[int] = Query(DEFAULT_LIMIT, ge=MIN_LIMIT, le=MAX_LIMIT, description="Number of results")
+    query: str = Depends(search_query),
+    limit: Optional[int] = Query(DEFAULT_LIMIT, ge=MIN_LIMIT, le=MAX_LIMIT, description="Number of results"),
+    page: int = Depends(search_page),
 ):
-    result = await gaanapy.search_songs(query, limit)
+    result = await gaanapy.search_songs(query, limit, page)
     if isinstance(result, dict) and "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return result
@@ -100,12 +149,11 @@ async def songs_info(
 
 @app.get("/albums/search/", summary="Search for albums.")
 async def albums_search(
-    query: str = Query(..., min_length=1, max_length=MAX_QUERY_LENGTH,
-                       pattern=SEARCH_QUERY_PATTERN,
-                       description="Name of the album to search for."),
-    limit: Optional[int] = Query(DEFAULT_LIMIT, ge=MIN_LIMIT, le=MAX_LIMIT)
+    query: str = Depends(search_query),
+    limit: Optional[int] = Query(DEFAULT_LIMIT, ge=MIN_LIMIT, le=MAX_LIMIT, description="Number of results"),
+    page: int = Depends(search_page),
 ):
-    result = await gaanapy.search_albums(query, limit)
+    result = await gaanapy.search_albums(query, limit, page)
     if isinstance(result, dict) and "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return result
@@ -121,12 +169,11 @@ async def albums_info(
 
 @app.get("/artists/search/", summary="Search for artists.")
 async def artists_search(
-    query: str = Query(..., min_length=1, max_length=MAX_QUERY_LENGTH,
-                       pattern=SEARCH_QUERY_PATTERN,
-                       description="Name of the artist to search for."),
-    limit: Optional[int] = Query(DEFAULT_LIMIT, ge=MIN_LIMIT, le=MAX_LIMIT)
+    query: str = Depends(search_query),
+    limit: Optional[int] = Query(DEFAULT_LIMIT, ge=MIN_LIMIT, le=MAX_LIMIT, description="Number of results"),
+    page: int = Depends(search_page),
 ):
-    result = await gaanapy.search_artists(query, limit)
+    result = await gaanapy.search_artists(query, limit, page)
     if isinstance(result, dict) and "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])
     return result
@@ -193,7 +240,7 @@ async def get_trending(
         raise HTTPException(status_code=404, detail=result["error"])
     return result
 
-@app.get("/newreleases", summary="Retrieve newly released songs and albums across languages.")
+@app.get("/newreleases", summary="Retrieve newly released songs and albums (up to `limit` of each).")
 async def get_new_releases(
     language: str = Query(..., min_length=1, max_length=MAX_LANGUAGE_LENGTH,
                           pattern=LANGUAGE_PATTERN,
@@ -216,9 +263,11 @@ async def get_charts(
 
 @app.get("/playlists/info/", summary="Retrieve detailed information on a playlist.")
 async def playlists_info(
-    seokey: str = Depends(validate_seokey)
+    seokey: str = Depends(validate_seokey),
+    limit: Optional[int] = Query(DEFAULT_PLAYLIST_LIMIT, ge=MIN_LIMIT, le=MAX_LIMIT,
+                                 description="Number of tracks")
 ):
-    playlist_info = await gaanapy.get_playlist_info(seokey)
+    playlist_info = await gaanapy.get_playlist_info(seokey, limit)
     if isinstance(playlist_info, dict) and "error" in playlist_info:
         raise HTTPException(status_code=404, detail=playlist_info["error"])
     return playlist_info

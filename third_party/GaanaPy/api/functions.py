@@ -67,7 +67,7 @@ class Functions:
         try:
             ids = []
             for i in results:
-                ids.append(i['artist_id'])
+                ids.append(str(i['artist_id']))  # Gaana may send numeric ids
             return ', '.join(ids)
         except (KeyError, TypeError):
             return ""

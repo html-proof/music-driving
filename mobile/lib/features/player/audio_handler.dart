@@ -225,8 +225,20 @@ class MelodiaAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandle
       _errors.add('None of these songs can be played right now.');
       return;
     }
+    // Never silently start a different song than the one tapped: an unplayable song
+    // starts the next playable one after it (and says so), or plays nothing.
+    final tapped = startIndex.clamp(0, tracks.length - 1);
+    var from = tapped;
+    while (from < tracks.length && !tracks[from].playable) {
+      from++;
+    }
+    if (from >= tracks.length) {
+      _errors.add('"${tracks[tapped].title}" can\'t be played right now.');
+      return;
+    }
+    if (from != tapped) _errors.add('"${tracks[tapped].title}" can\'t be played right now. Playing the next song.');
     _reportListen(completed: false);
-    final start = tracks.isEmpty ? 0 : playable.indexOf(tracks[startIndex.clamp(0, tracks.length - 1)]);
+    final start = playable.indexOf(tracks[from]);
     if (shuffle != null) _queue.shuffle = shuffle;
     _queue.replace(playable, startIndex: start < 0 ? 0 : start);
     _context = context;
