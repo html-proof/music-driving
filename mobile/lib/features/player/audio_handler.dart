@@ -439,7 +439,7 @@ class MelodiaAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandle
     try {
       final info = await _streamFor(track);
       if (generation != _loadGeneration) return; // user skipped meanwhile
-      await _engine.setUrl(info.url, initialPosition: position);
+      await _engine.setUrl(info.url, initialPosition: position, hls: info.isHls);
       if (generation != _loadGeneration) return;
       final seekTo = _seekWhileLoading;
       _seekWhileLoading = null;

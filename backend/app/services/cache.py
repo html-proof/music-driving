@@ -91,8 +91,10 @@ class RedisCache:
         await self._redis.aclose()
 
 
-def build_cache(redis_url: str) -> Cache:
+def build_cache(redis_url: str, namespace: str = "") -> Cache:
+    """`namespace` keeps providers apart in a shared Redis: their catalogue keys
+    (`trending:English`, `song:<id>`, last-good copies) would otherwise collide."""
     if redis_url:
-        return RedisCache(redis_url)
+        return RedisCache(redis_url, prefix=f"melodia:{namespace}:" if namespace else "melodia:")
     log.warning("REDIS_URL not set: using in-process memory cache (single instance only)")
     return MemoryCache()

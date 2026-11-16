@@ -40,6 +40,13 @@ class HomeService:
     async def feed(self, user: User | None, languages: list[str] | None, tz: str | None) -> HomeFeed:
         prefs = user.preferences if user else None
         langs = languages or (prefs.languages if prefs and prefs.languages else self.catalog.settings.default_language_list)
+        # Feeds follow languages for Gaana; providers without languages (Audius) map them
+        # to genres, falling back to a single all-genre feed.
+        provider = self.catalog.provider
+        by_language = getattr(provider, "uses_languages", True)
+        feeds = langs if by_language else provider.categories_for(langs)
+        titles = getattr(provider, "section_titles", {})
+        label = (lambda f: f) if by_language else (lambda f: None if f == "All" else f)
         allow_explicit = prefs.allow_explicit if prefs else True
         errors: dict[str, str] = {}
         sections: list[HomeSection] = []
@@ -56,8 +63,8 @@ class HomeService:
         # listed song costs one Gaana request when a list is refreshed, so rows are kept
         # short (HOME_SECTION_SIZE) and cached for an hour.
         size = self.catalog.settings.home_section_size
-        jobs = {f"trending:{lang}": self.catalog.trending(lang, size) for lang in langs[:3]}
-        jobs[f"new:{langs[0]}"] = self.catalog.new_releases(langs[0], size)
+        jobs = {f"trending:{lang}": self.catalog.trending(lang, size) for lang in feeds[:3]}
+        jobs[f"new:{feeds[0]}"] = self.catalog.new_releases(feeds[0], size)
         jobs["charts"] = self.catalog.charts(12)
         results = dict(zip(jobs, await asyncio.gather(*jobs.values(), return_exceptions=True), strict=True))
 
@@ -75,7 +82,7 @@ class HomeService:
 
         trending_tracks: list[Track] = []
         unavailable: list[str] = []
-        for i, lang in enumerate(langs[:3]):
+        for i, lang in enumerate(feeds[:3]):
             res = results[f"trending:{lang}"]
             if isinstance(res, list) and res:
                 tracks = _filter_explicit(res, allow_explicit)
@@ -83,27 +90,29 @@ class HomeService:
                 sections.append(HomeSection(
                     id=f"trending_{lang.lower()}",
                     title="Trending now" if i == 0 else f"Popular in {lang}",
-                    subtitle=lang if i == 0 else "Regional picks",
+                    subtitle=label(lang) if i == 0 else ("Regional picks" if by_language else "Genre picks"),
                     type="tracks", tracks=tracks,
                 ))
             elif isinstance(res, BaseException) and not isinstance(res, ProviderNotFound):
                 errors[f"trending_{lang.lower()}"] = _msg(res)
-                unavailable.append(lang)
+                unavailable.append(label(lang) or "Trending")
 
-        new = results[f"new:{langs[0]}"]
+        new = results[f"new:{feeds[0]}"]
         if not isinstance(new, BaseException):
             if new.albums:
-                sections.append(HomeSection(id="new_albums", title="New releases", subtitle=langs[0],
+                sections.append(HomeSection(id="new_albums", title=titles.get("new_albums", "New releases"),
+                                            subtitle=label(feeds[0]),
                                             type="albums", albums=new.albums))
             if new.tracks:
-                sections.append(HomeSection(id="new_tracks", title="New songs", subtitle=langs[0],
+                sections.append(HomeSection(id="new_tracks", title=titles.get("new_tracks", "New songs"),
+                                            subtitle=label(feeds[0]),
                                             type="tracks", tracks=_filter_explicit(new.tracks, allow_explicit)))
         elif not isinstance(new, ProviderNotFound):
             errors["new_releases"] = _msg(new)
 
         charts = results["charts"]
         if isinstance(charts, list) and charts:
-            sections.append(HomeSection(id="charts", title="Top charts", type="playlists", playlists=charts))
+            sections.append(HomeSection(id="charts", title=titles.get("charts", "Top charts"), type="playlists", playlists=charts))
         elif isinstance(charts, BaseException) and not isinstance(charts, ProviderNotFound):
             errors["charts"] = _msg(charts)
 
@@ -122,7 +131,7 @@ class HomeService:
                 ))
 
         # Order: recently played, made for you, trending, new, charts, artists, then regional.
-        first_trending = f"trending_{langs[0].lower()}"
+        first_trending = f"trending_{feeds[0].lower()}"
         order = ["recently_played", "made_for_you", first_trending, "new_albums", "new_tracks", "charts",
                  "top_artists"]
         sections.sort(key=lambda s: order.index(s.id) if s.id in order else len(order))
