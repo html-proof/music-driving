@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,7 +28,7 @@ Future<void> main() async {
   final tokens = TokenStorage();
   // The device id doubles as the installation id the backend uses for this device.
   final installationId = (await tokens.deviceCredentials()).deviceId;
-  final cache = SqliteLocalCache();
+  final LocalCache cache = kIsWeb ? PrefsLocalCache(prefs) : SqliteLocalCache();
   final api = ApiClient(tokens: tokens);
   final music = MusicRepository(api, cache);
   final playbackRepo = PlaybackRepository(api, tokens, installationId);
