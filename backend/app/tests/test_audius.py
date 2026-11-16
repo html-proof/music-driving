@@ -10,7 +10,7 @@ import pytest
 
 from app.database import Base, create_engine_from_settings
 from app.integrations.audius.client import AudiusClient
-from app.integrations.audius.provider import AudiusProvider, genre_for
+from app.integrations.audius.provider import LANGUAGES, AudiusProvider, category_for, genre_for
 from app.main import create_app
 from app.tests.conftest import auth, register
 
@@ -49,13 +49,26 @@ class FakeAudius:
             f"/playlists/{PLAYLIST}": "playlist", f"/playlists/{PLAYLIST}/tracks": "playlist_tracks",
         }
 
+        # Track search results per query (lower case); other queries get the recorded search.
+        self.searches: dict[str, list[dict]] = {}
+
     def paths(self) -> list[str]:
         return [r.url.path.removeprefix("/v1") for r in self.calls]
+
+    def track_like(self, track_id: str, title: str, plays: int, tags: str = "", **extra) -> dict:
+        """A playable track record built from a recorded one."""
+        row = copy.deepcopy(self.tracks[TRACK_ID])
+        row.update(id=track_id, title=title, play_count=plays, tags=tags, description="", **extra)
+        self.tracks[track_id] = row
+        return row
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         self.calls.append(request)
         assert request.url.params.get("app_name") == "Melodia"
         path = request.url.path.removeprefix("/v1")
+        query = (request.url.params.get("query") or "").lower()
+        if path == "/tracks/search" and query in self.searches:
+            return httpx.Response(200, json={"data": self.searches[query]})
         if path in self.routes:
             return httpx.Response(200, json=_load(self.routes[path]))
         if path.startswith("/tracks/") and path.count("/") == 2 and path.split("/")[2] in self.tracks:
@@ -98,16 +111,82 @@ def test_genre_matching():
     assert genre_for(None) is None
 
 
-async def test_home_uses_one_all_genre_feed_for_languages(audius_client, fake_audius):
-    r = await audius_client.get(f"{API}/home", params={"languages": "English,Hindi"})
+def test_language_feeds():
+    provider = AudiusProvider(None)  # no requests made
+    assert provider.categories_for(["Hindi", "tamil", "English", "Jazz", "Klingon"]) == ["Hindi", "Tamil", "All", "Jazz"]
+    assert provider.categories_for(["Klingon"]) == ["All"]
+    # Every language the app offers (mobile AppConfig.supportedLanguages) has a feed.
+    offered = ["English", "Hindi", "Punjabi", "Tamil", "Telugu", "Bengali", "Marathi", "Kannada", "Malayalam",
+               "Gujarati"]
+    assert all(category_for(lang) for lang in offered)
+    assert provider.is_language("Tamil") and not provider.is_language("Jazz") and not provider.is_language("All")
+
+
+def test_language_match_ignores_fuzzy_search_hits():
+    tamil, gujarati = LANGUAGES["Tamil"], LANGUAGES["Gujarati"]
+
+    def row(title, tags="", artist="Someone"):
+        return {"title": title, "tags": tags, "user": {"name": artist}}
+
+    assert tamil.matches(row("Kaavaalaa from jailer tamil"))
+    assert tamil.matches(row("Alaigal Waves", tags="tamil,kollywood,indian"))
+    assert tamil.matches(row("தமிழ் பாடல்"))
+    assert not tamil.matches(row("Halloween X (Live at the Hollywood Palladium)"))  # "kollywood" search hit
+    assert not tamil.matches(row("Tamilnadu Drive"))  # whole words only
+    assert gujarati.matches(row("Hansla (2015) - Gujarati Folk Video Song"))
+    assert not gujarati.matches(row("Na bar bigi sa bigi", artist="SEN. KABIR GARBA MARAF"))
+    assert not LANGUAGES["Kannada"].matches(row("Boogie", artist="adanna duru"))  # "kannada" search hit
+    assert LANGUAGES["Malayalam"].matches(row("Untitled", artist="Malayalam songs"))
+
+
+async def test_home_has_a_row_per_language(audius_client, fake_audius):
+    f = fake_audius
+    f.searches = {
+        "hindi": [f.track_like("h1", "90s Songs Hindi", 900), f.track_like("x1", "Hollywood Nights", 99999),
+                  f.track_like("h2", "Tum Hi Ho", 500, tags="bollywood,romantic")],
+        "bollywood": [f.track_like("h3", "Bollywood Action India", 700), f.track_like("h2", "Tum Hi Ho", 500,
+                                                                                      tags="bollywood,romantic")],
+        "tamil": [f.track_like("t1", "Kaavaalaa from jailer tamil", 1900),
+                  f.track_like("t2", "Gated tamil song", 5000, is_stream_gated=True)],
+        "kollywood": [f.track_like("x2", "Halloween X (Live at the Hollywood Palladium)", 39742)],
+    }
+    feed = (await audius_client.get(f"{API}/home", params={"languages": "Hindi,Tamil,English"})).json()
+    rows = {s["id"]: s for s in feed["sections"]}
+    assert feed["sections"][0]["id"] == "trending_hindi"
+    # Matching, playable songs only, most played first, each once.
+    assert [t["id"] for t in rows["trending_hindi"]["tracks"]] == ["h1", "h3", "h2"]
+    assert rows["trending_hindi"]["subtitle"] == "Hindi"
+    assert [t["id"] for t in rows["trending_tamil"]["tracks"]] == ["t1"]
+    assert rows["trending_tamil"]["title"] == "Popular in Tamil"
+    assert rows["trending_tamil"]["subtitle"] == "Regional picks"
+    # English: Audius's all-genre trending, titled sensibly when it isn't the first row.
+    assert rows["trending_all"]["title"] == "Trending worldwide"
+    assert rows["trending_all"]["tracks"][0]["id"] == TRACK_ID
+    searches = [c.url.params for c in f.calls if c.url.path == "/v1/tracks/search"]
+    assert {p["query"] for p in searches} == {"hindi", "bollywood", "tamil", "kollywood"}
+    assert all(p["sort_method"] == "popular" for p in searches)
+    assert feed["unavailable_languages"] == []
+
+
+async def test_trending_endpoint_serves_a_language(audius_client, fake_audius):
+    fake_audius.searches = {"punjabi": [fake_audius.track_like("p1", "295 - Sidhu Moose Wala", 33814,
+                                                                tags="punjabi,sidhumoosewala")]}
+    r = await audius_client.get(f"{API}/trending", params={"language": "Punjabi"})
+    assert r.status_code == 200, r.text
+    assert [t["id"] for t in r.json()] == ["p1"]
+
+
+async def test_home_uses_one_all_genre_feed_without_known_languages(audius_client, fake_audius):
+    r = await audius_client.get(f"{API}/home", params={"languages": "English"})
     assert r.status_code == 200, r.text
     feed = r.json()
     titles = [s["title"] for s in feed["sections"]]
     assert titles.count("Trending now") == 1 and not any(t.startswith("Popular in") for t in titles)
     assert {"Top albums", "Fresh & underground", "Trending playlists"} <= set(titles)
-    assert feed["languages"] == ["English", "Hindi"]
+    assert feed["languages"] == ["English"]
     trending_calls = [c for c in fake_audius.calls if c.url.path == "/v1/tracks/trending"]
     assert trending_calls and all("genre" not in c.url.params for c in trending_calls)
+    assert "/tracks/search" not in fake_audius.paths()
     first = feed["sections"][0]
     assert first["subtitle"] is None and first["tracks"][0]["id"] == TRACK_ID
 
@@ -116,7 +195,8 @@ async def test_home_filters_by_a_language_that_names_a_genre(audius_client, fake
     feed = (await audius_client.get(f"{API}/home", params={"languages": "Jazz,English"})).json()
     assert feed["sections"][0]["id"] == "trending_jazz"
     genres = {c.url.params.get("genre") for c in fake_audius.calls if c.url.path == "/v1/tracks/trending"}
-    assert genres == {"Jazz"}
+    assert genres == {"Jazz", None}  # English adds the all-genre row
+    assert [s["id"] for s in feed["sections"] if s["id"].startswith("trending_")] == ["trending_jazz", "trending_all"]
 
 
 async def test_stream_is_a_progressive_mp3_without_hls_check(audius_client, fake_audius):

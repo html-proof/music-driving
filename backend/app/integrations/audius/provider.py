@@ -1,5 +1,9 @@
 import asyncio
+import re
 from collections import OrderedDict
+from dataclasses import dataclass
+from functools import cached_property
+from itertools import chain
 from typing import ClassVar
 
 from app.integrations.audius import normalize as n
@@ -25,22 +29,83 @@ GENRES = [
     "Dubstep", "Drum & Bass", "Techno", "Trap", "Jazz", "Acoustic", "Classical", "Latin", "Reggae",
     "Country", "Folk", "Metal", "Soundtrack", "World", "Experimental",
 ]
-_GENRE_KEYS = {"".join(ch for ch in g.lower() if ch.isalnum()): g for g in GENRES}
+def _key(name: str) -> str:
+    return "".join(ch for ch in name.lower() if ch.isalnum())
+
+
+_GENRE_KEYS = {_key(g): g for g in GENRES}
 ALL = "All"
 
 
+@dataclass(frozen=True)
+class LanguageSearch:
+    """How to find a language's songs on Audius, which has no language field.
+
+    `queries` are searched (most played first); Audius search is fuzzy ("kollywood"
+    returns Hollywood, "kannada" returns "adanna"), so a track is kept only when its
+    title, tags, description or artist name contains one of `words` as a whole word.
+    """
+
+    queries: tuple[str, ...]
+    words: tuple[str, ...]
+
+    @cached_property
+    def _pattern(self) -> re.Pattern:
+        alternatives = "|".join(re.escape(w) for w in self.words)
+        return re.compile(rf"(?<!\w)(?:{alternatives})(?!\w)", re.IGNORECASE)
+
+    def matches(self, row: dict) -> bool:
+        user = row.get("user") if isinstance(row.get("user"), dict) else {}
+        text = " ".join(str(v) for v in (row.get("title"), row.get("tags"), row.get("description"),
+                                          user.get("name"), user.get("handle")) if v)
+        return bool(self._pattern.search(text))
+
+
+# The app's music languages (mobile AppConfig.supportedLanguages), each with its own
+# name in native script. English is Audius's own (mostly English) trending feed.
+LANGUAGES: dict[str, LanguageSearch] = {
+    "Hindi": LanguageSearch(("hindi", "bollywood"), ("hindi", "bollywood", "हिंदी", "हिन्दी")),
+    "Tamil": LanguageSearch(("tamil", "kollywood"), ("tamil", "kollywood", "தமிழ்")),
+    "Telugu": LanguageSearch(("telugu", "tollywood"), ("telugu", "tollywood", "తెలుగు")),
+    "Punjabi": LanguageSearch(("punjabi", "bhangra"), ("punjabi", "bhangra", "ਪੰਜਾਬੀ")),
+    "Bengali": LanguageSearch(("bengali", "bangla"), ("bengali", "bangla", "বাংলা")),
+    "Marathi": LanguageSearch(("marathi",), ("marathi", "मराठी")),
+    "Kannada": LanguageSearch(("kannada",), ("kannada", "ಕನ್ನಡ")),
+    "Malayalam": LanguageSearch(("malayalam", "mollywood"), ("malayalam", "mollywood", "മലയാളം")),
+    # Not "garba": also a common surname, so artist names matched unrelated songs.
+    "Gujarati": LanguageSearch(("gujarati",), ("gujarati", "ગુજરાતી")),
+}
+_LANGUAGE_KEYS = {_key(name): name for name in LANGUAGES}
+# Each query asks for this many results, so enough survive the word filter.
+LANGUAGE_SEARCH_SIZE = 40
+
+
 def genre_for(category: str | None) -> str | None:
-    """The Audius genre matching a language/category name, or None for "every genre".
-    Audius has no languages, so the app's language preferences only narrow the feed when
-    they happen to name a genre ("Pop", "Jazz", "Hiphop Rap", ...)."""
+    """The Audius genre matching a category name ("Pop", "Jazz", "Hiphop Rap", ...), or
+    None for "every genre"."""
     if not category:
         return None
-    return _GENRE_KEYS.get("".join(ch for ch in category.lower() if ch.isalnum()))
+    return _GENRE_KEYS.get(_key(category))
+
+
+def language_for(category: str | None) -> str | None:
+    """The app language a category names ("Hindi", "tamil", ...), if it is one."""
+    return _LANGUAGE_KEYS.get(_key(category)) if category else None
+
+
+def category_for(name: str) -> str | None:
+    """Home feed for one of the user's language preferences: a genre, a searched
+    language, or the all-genre feed for English. None when Audius has nothing for it."""
+    if genre := genre_for(name):
+        return genre
+    if language := language_for(name):
+        return language
+    return ALL if _key(name) == "english" else None
 
 
 class AudiusProvider:
     name = "audius"
-    # Trending/new are filtered by genre, not language (see `categories_for`).
+    # Home feeds are genres or searched languages, not provider languages (see `categories_for`).
     uses_languages = False
     # One progressive MP3 per track behind a redirecting endpoint: nothing to verify.
     stream_format = "mp3"
@@ -60,9 +125,15 @@ class AudiusProvider:
         return await self.client.health()
 
     def categories_for(self, languages: list[str]) -> list[str]:
-        """Genres named in the user's language list, else one all-genre feed."""
-        genres = list(dict.fromkeys(g for g in (genre_for(lang) for lang in languages) if g))
-        return genres or [ALL]
+        """One Home feed per language preference, in the user's order: genres as genres,
+        Indian languages as searched language feeds, English as all-genre trending.
+        Falls back to one all-genre feed."""
+        feeds = list(dict.fromkeys(c for c in (category_for(lang) for lang in languages) if c))
+        return feeds or [ALL]
+
+    @staticmethod
+    def is_language(feed: str) -> bool:
+        return language_for(feed) is not None
 
     def _stream(self, t: Track) -> dict[AudioQuality, str]:
         return {AudioQuality.high: self.client.stream_url(t.id)} if t.playable else {}
@@ -142,8 +213,20 @@ class AudiusProvider:
 
     # --- discovery ----------------------------------------------------------------
     async def trending(self, language: str, limit: int) -> list[Track]:
-        """Trending this week, in the genre `language` names (all genres otherwise)."""
+        """For a language: its most played songs (see `LANGUAGES`). Otherwise trending
+        this week, in the genre `language` names (all genres otherwise)."""
+        if lang := language_for(language):
+            return await self._language_tracks(LANGUAGES[lang], limit)
         return self._tracks(await self.client.trending(limit, genre=genre_for(language)))
+
+    async def _language_tracks(self, spec: LanguageSearch, limit: int) -> list[Track]:
+        batches = await asyncio.gather(*[
+            self.client.search_tracks(q, LANGUAGE_SEARCH_SIZE, sort="popular") for q in spec.queries
+        ])
+        rows = {r["id"]: r for r in chain.from_iterable(batches)
+                if isinstance(r, dict) and r.get("id") and spec.matches(r)}
+        ranked = sorted(rows.values(), key=lambda r: r.get("play_count") or 0, reverse=True)
+        return [t for t in self._tracks(ranked) if t.playable][:limit]
 
     async def new_releases(self, language: str, limit: int) -> NewReleases:
         # Audius has no "new releases" feed: underground trending (newer, smaller artists)

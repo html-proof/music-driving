@@ -67,8 +67,9 @@ class AudiusClient:
             return False
 
     # --- endpoints -------------------------------------------------------------
-    async def search_tracks(self, query: str, limit: int) -> list[dict]:
-        return await self._get("/tracks/search", query=query, limit=limit) or []
+    async def search_tracks(self, query: str, limit: int, sort: str | None = None) -> list[dict]:
+        """`sort`: None (relevance), "popular" or "recent"."""
+        return await self._get("/tracks/search", query=query, limit=limit, sort_method=sort) or []
 
     async def search_users(self, query: str, limit: int) -> list[dict]:
         return await self._get("/users/search", query=query, limit=limit) or []

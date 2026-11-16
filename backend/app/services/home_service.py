@@ -47,6 +47,8 @@ class HomeService:
         feeds = langs if by_language else provider.categories_for(langs)
         titles = getattr(provider, "section_titles", {})
         label = (lambda f: f) if by_language else (lambda f: None if f == "All" else f)
+        # Audius language feeds are searched rather than native, but still regional rows.
+        is_language = (lambda f: True) if by_language else getattr(provider, "is_language", lambda f: False)
         allow_explicit = prefs.allow_explicit if prefs else True
         errors: dict[str, str] = {}
         sections: list[HomeSection] = []
@@ -89,8 +91,8 @@ class HomeService:
                 trending_tracks.extend(tracks)
                 sections.append(HomeSection(
                     id=f"trending_{lang.lower()}",
-                    title="Trending now" if i == 0 else f"Popular in {lang}",
-                    subtitle=label(lang) if i == 0 else ("Regional picks" if by_language else "Genre picks"),
+                    title="Trending now" if i == 0 else (f"Popular in {lang}" if label(lang) else "Trending worldwide"),
+                    subtitle=label(lang) if i == 0 else ("Regional picks" if is_language(lang) else "Genre picks"),
                     type="tracks", tracks=tracks,
                 ))
             elif isinstance(res, BaseException) and not isinstance(res, ProviderNotFound):
