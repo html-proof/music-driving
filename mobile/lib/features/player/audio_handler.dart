@@ -432,6 +432,9 @@ class MelodiaAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandle
     _listenedSeconds = 0;
     _lastPosition = _loadPosition;
     mediaItem.add(mediaItemFor(track));
+    // just_audio keeps playing across a source change, so a load that must end paused
+    // (e.g. Next on the last song) has to pause explicitly or the new song autoplays.
+    if (!play && _engine.playing) await _engine.pause();
     _broadcast();
     try {
       final info = await _streamFor(track);
@@ -448,7 +451,11 @@ class MelodiaAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandle
       _activeStreamQuality = info.quality;
       _consecutiveFailures = 0;
       _loading = false;
-      if (_playAfterLoad) await _engine.play();
+      if (_playAfterLoad) {
+        await _engine.play();
+      } else if (_engine.playing) {
+        await _engine.pause(); // paused during the load, or a load that must not play
+      }
       _broadcast();
       _persist();
       _prefetchNext();
@@ -475,8 +482,13 @@ class MelodiaAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandle
     _streams.remove(track.id);
     final failure = AppException.from(error);
     final reason = failure.message;
-    if (failure.isNetwork) {
-      _errors.add('Connection lost. Press play to retry "${track.title}".');
+    // Not the song's fault: no connection, or the provider/backend is down (5xx, e.g.
+    // "Music provider is currently unavailable"). Skipping would burn through the whole
+    // queue during an outage, so hold this song; play() retries it.
+    if (failure.isNetwork || (failure.statusCode ?? 0) >= 500) {
+      _errors.add(failure.isNetwork
+          ? 'Connection lost. Press play to retry "${track.title}".'
+          : "Couldn't play \"${track.title}\": $reason. Press play to retry.");
       await _stopWithError(reason, position);
       return;
     }

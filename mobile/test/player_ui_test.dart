@@ -8,6 +8,7 @@ import 'package:melodia/features/player/widgets/player_controls.dart';
 import 'package:melodia/providers/core_providers.dart';
 
 import 'audio_handler_test.dart' show FakeEngine, FakeReporter, MemoryStore;
+import 'package:melodia/core/errors/app_exception.dart';
 import 'package:melodia/models/catalog.dart';
 import 'widgets_test.dart' show makeHandler, pumpFrames, songs;
 
@@ -153,5 +154,66 @@ void main() {
     final second = make();
     await second.init();
     expect(second.quality, 'very_high');
+  });
+
+  test('a provider outage (5xx) holds the song instead of skipping through the queue', () async {
+    final engine = FakeEngine();
+    var providerDown = true;
+    final handler = MelodiaAudioHandler(
+      engine: engine,
+      resolveStream: (id, q) async {
+        if (providerDown) throw const AppException('Music provider is currently unavailable', statusCode: 503);
+        return StreamInfo(url: 'https://cdn/$id.m3u8', quality: q, bitrateKbps: 128,
+            expiresAt: DateTime.now().toUtc().add(const Duration(hours: 4)));
+      },
+      reporter: FakeReporter(),
+      store: MemoryStore(),
+      configureSession: false,
+    );
+    final errors = <String>[];
+    handler.errors.listen(errors.add);
+    await handler.playTracks(songs);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(handler.currentTrack!.id, 'a'); // not skipped to 'b'
+    expect(handler.playbackState.value.processingState, AudioProcessingState.error);
+    expect(errors.single, contains('Press play to retry'));
+
+    providerDown = false; // provider back: Play retries the same song
+    await handler.play();
+    expect(handler.currentTrack!.id, 'a');
+    expect(engine.playing, isTrue);
+  });
+
+  test('a song with no stream (404) is still skipped', () async {
+    final engine = FakeEngine();
+    final handler = MelodiaAudioHandler(
+      engine: engine,
+      resolveStream: (id, q) async {
+        if (id == 'a') throw const AppException('Song not found', statusCode: 404);
+        return StreamInfo(url: 'https://cdn/$id.m3u8', quality: q, bitrateKbps: 128,
+            expiresAt: DateTime.now().toUtc().add(const Duration(hours: 4)));
+      },
+      reporter: FakeReporter(),
+      store: MemoryStore(),
+      configureSession: false,
+    );
+    await handler.playTracks(songs);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(handler.currentTrack!.id, 'b');
+    expect(engine.playing, isTrue);
+  });
+
+  test('Next on the last song (repeat off) goes back to the first song, paused', () async {
+    // Found on a real phone: just_audio keeps playing across a source change, so the
+    // first song started playing on its own.
+    final engine = FakeEngine();
+    final handler = makeHandler(engine);
+    await handler.playTracks(songs, startIndex: 1);
+    expect(engine.playing, isTrue);
+    await handler.skipToNext();
+    expect(handler.currentTrack!.id, 'a');
+    expect(engine.position, Duration.zero);
+    expect(engine.playing, isFalse);
+    expect(handler.playbackState.value.playing, isFalse);
   });
 }
