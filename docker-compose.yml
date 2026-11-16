@@ -1,4 +1,5 @@
-# Full stack: nginx -> backend (FastAPI) -> PostgreSQL, Redis, GaanaPy.
+# Full stack: nginx -> backend (FastAPI) -> PostgreSQL, Redis, and the music provider
+# (Audius public API by default; GaanaPy with MUSIC_PROVIDER=gaana and --profile gaana).
 # Usage: cp .env.example .env  (edit secrets)  &&  docker compose up -d --build
 name: melodia
 
@@ -29,7 +30,9 @@ services:
       retries: 5
 
   gaanapy:
+    # Only for MUSIC_PROVIDER=gaana: `docker compose --profile gaana up -d`.
     # Vendored copy with local fixes (third_party/patches/gaanapy-local-fixes.patch).
+    profiles: [gaana]
     build: ./third_party/GaanaPy
     restart: unless-stopped
     healthcheck:
@@ -44,11 +47,14 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
-      gaanapy: { condition: service_started }
+      gaanapy: { condition: service_started, required: false }
     environment:
       ENVIRONMENT: production
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-melodia}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-melodia}
       REDIS_URL: redis://redis:6379/0
+      # audius (default): public Audius API. gaana: the gaanapy service (needs --profile gaana).
+      MUSIC_PROVIDER: ${MUSIC_PROVIDER:-audius}
+      AUDIUS_APP_NAME: ${AUDIUS_APP_NAME:-Melodia}
       GAANAPY_BASE_URL: http://gaanapy:8000
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       CORS_ORIGINS: ${CORS_ORIGINS:-*}

@@ -17,6 +17,7 @@ class FakeEngine implements AudioEngine {
   final _dur = StreamController<Duration?>.broadcast();
   final _err = StreamController<Object>.broadcast();
   final loadedUrls = <String>[];
+  final loadedHls = <bool>[];
   final failUrls = <String>{};
 
   @override
@@ -44,9 +45,10 @@ class FakeEngine implements AudioEngine {
   Stream<Object> get errorStream => _err.stream;
 
   @override
-  Future<Duration?> setUrl(String url, {Duration? initialPosition}) async {
+  Future<Duration?> setUrl(String url, {Duration? initialPosition, bool hls = true}) async {
     if (failUrls.contains(url)) throw Exception('Source error');
     loadedUrls.add(url);
+    loadedHls.add(hls);
     position = initialPosition ?? Duration.zero;
     state = EngineState.ready;
     _state.add(state);
@@ -145,6 +147,7 @@ void main() {
   late List<String> resolved;
   late Set<String> unavailable;
   late Set<String> offline;
+  late Set<String> progressive;
   late DateTime Function() expiry;
 
   Future<StreamInfo> resolve(String id, String quality) async {
@@ -152,7 +155,7 @@ void main() {
     if (offline.contains(id)) throw const AppException('Can\'t reach the server.', isNetwork: true);
     if (unavailable.contains(id)) throw const AppException('No stream', statusCode: 404);
     return StreamInfo(url: 'https://cdn/$id/$quality.m3u8?n=${resolved.length}', quality: quality, bitrateKbps: 128,
-        expiresAt: expiry());
+        expiresAt: expiry(), format: progressive.contains(id) ? 'mp3' : 'hls');
   }
 
   setUp(() {
@@ -162,6 +165,7 @@ void main() {
     resolved = [];
     unavailable = {};
     offline = {};
+    progressive = {};
     expiry = () => DateTime.now().toUtc().add(const Duration(hours: 4));
     handler = MelodiaAudioHandler(
       engine: engine,
@@ -182,6 +186,20 @@ void main() {
     expect(handler.mediaItem.value!.title, 'Song 1');
     expect(handler.queue.value.length, 3);
     expect(handler.playbackState.value.queueIndex, 1);
+  });
+
+  test('loads HLS or progressive sources as the stream format says', () async {
+    progressive = {'s1'};
+    await handler.playTracks(tracks(3), startIndex: 0);
+    await handler.skipToNext();
+    expect(handler.currentTrack!.id, 's1');
+    expect(engine.loadedHls, [true, false]);
+  });
+
+  test('StreamInfo reads the stream format, defaulting to HLS', () {
+    final base = {'url': 'https://x/1', 'quality': 'high', 'bitrate_kbps': 128};
+    expect(StreamInfo.fromJson(base).isHls, isTrue);
+    expect(StreamInfo.fromJson({...base, 'format': 'mp3'}).isHls, isFalse);
   });
 
   test('previous within 3 s goes back; after 3 s restarts', () async {

@@ -16,7 +16,8 @@ Errors use `{"detail": "..."}` with these status codes:
 
 ## Identifiers
 
-* **Songs, albums, artists, provider playlists** use the provider **seokey** (e.g. `tyler-herro`) as `id`.
+* **Songs, albums, artists, provider playlists** use the provider's id as `id`: the Gaana **seokey** (e.g.
+  `tyler-herro`) or the Audius hash id (e.g. `J7Xb000`). Audius `numeric_id`s are hash ids too.
 * **Artist tracks / similar albums** need the numeric id (`numeric_id` in responses).
 * **User playlists** use UUIDs.
 
@@ -72,7 +73,7 @@ A known `device_id` with the wrong secret gets `401`.
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/home?languages=English,Hindi` | Sections: recently played, made for you, trending, new releases, charts, trending artists, regional. Per-section provider failures are listed in `errors`. |
+| GET | `/home?languages=English,Hindi` | Sections: recently played, made for you, trending, new releases, charts, trending artists, regional. Per-section provider failures are listed in `errors`. Audius has no languages: entries that name a genre (`Jazz`, `Pop`, ...) give per-genre rows, otherwise one all-genre trending row. |
 | GET | `/search?q=&limit=10&save=false` | `{songs, albums, artists, playlists, errors}`. `save=true` stores the query in search history (signed in). |
 | GET | `/songs/{seokey}` | Track |
 | GET | `/albums/{seokey}` | Album with tracks |
@@ -118,15 +119,16 @@ positions consistent.
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/playback/stream/{song_id}?quality=` | `{url, quality, requested_quality, bitrate_kbps, expires_at, available_qualities, format: "hls"}` |
+| GET | `/playback/stream/{song_id}?quality=` | `{url, quality, requested_quality, bitrate_kbps, expires_at, available_qualities, format}`; `format` is `mp3` (Audius) or `hls` (Gaana) |
 | POST | `/playback/session` | Upsert this device's `{queue[], current_index, position_seconds, shuffle, repeat_mode, quality, context, installation_id}` |
 | POST | `/playback/progress` | `{session_id?, song_id, position_seconds, current_index?}` |
 | POST | `/playback/complete` | `{song_id, seconds_listened, completed, context?}`; plays under 5 s are ignored (`recorded: false`) |
 | GET | `/playback/queue[?session_id=]` | Queue with track metadata; unavailable ids are listed separately |
 | GET | `/lyrics/{song_id}` | `{available, synced, instrumental, lines: [{time_ms, text}], plain_text, source}` |
 
-**Stream URLs:** the app streams HLS directly from the provider CDN. The backend never proxies or stores
-audio. URLs carry a token that expires about 4 hours after it is issued (`expires_at`); call the endpoint
+**Stream URLs:** the app streams directly from the provider; the backend never proxies or stores audio.
+**Audius** (default): one progressive MP3 per track, `quality: high`, no `expires_at`. The URL is Audius'
+stream endpoint, which redirects to a fresh signed file each time it is opened. **Gaana**: HLS. URLs carry a token that expires about 4 hours after it is issued (`expires_at`); call the endpoint
 again before then. Before returning a quality, the backend checks that its HLS playlist actually exists.
 If it doesn't, the backend steps down to the next quality that does, and reports it in `quality`.
 

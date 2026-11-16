@@ -94,6 +94,9 @@ docker compose -f docker-compose.yml -f docker-compose.cloudflare.yml up -d --bu
 nginx then uses `deploy/nginx/nginx.tunnel.conf` (plain HTTP on the compose network, real client IP from
 `CF-Connecting-IP`) and publishes no host ports. The stack runs on its own `melodia-net` network.
 `cloudflared tunnel route dns` appends its own zone to names outside it, so check the name it prints.
+After changing a file in `deploy/nginx/` on the server, run `docker compose ... up -d --force-recreate nginx`:
+the config is a single-file bind mount, so a replaced file (git pull, tar, editors) stays invisible to a
+running container and `nginx -s reload` keeps the old config.
 
 ### Environment variables
 See `backend/.env.example` (all backend settings) and `.env.example` (compose). Key ones:
@@ -103,8 +106,10 @@ See `backend/.env.example` (all backend settings) and `.env.example` (compose). 
 | `DATABASE_URL` | `postgresql+psycopg://user:pass@host:5432/db` |
 | `REDIS_URL` | Shared cache and rate limits. Required with more than one worker or instance. |
 | `JWT_SECRET` | Signs access tokens. Long and random; rotating it signs everyone out. |
-| `GAANAPY_BASE_URL` | URL of the GaanaPy service |
-| `VERIFY_STREAM_QUALITY` | Check that each HLS quality exists before returning it |
+| `MUSIC_PROVIDER` | `audius` (default, public Audius API) or `gaana` (also start compose with `--profile gaana`) |
+| `AUDIUS_APP_NAME` | Name sent to Audius as `app_name` (default `Melodia`) |
+| `GAANAPY_BASE_URL` | URL of the GaanaPy service (Gaana only) |
+| `VERIFY_STREAM_QUALITY` | Check that each HLS quality exists before returning it (Gaana only) |
 | `LYRICS_USER_AGENT` | LRCLIB asks clients to identify themselves |
 | `WEB_CONCURRENCY` | uvicorn workers |
 

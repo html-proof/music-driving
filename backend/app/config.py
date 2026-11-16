@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -32,7 +33,12 @@ class Settings(BaseSettings):
     # CORS (comma separated)
     cors_origins: str = "*"
 
-    # Music provider (GaanaPy service)
+    # Music provider: "audius" (public Audius API, artist-uploaded music) or "gaana"
+    # (the GaanaPy service; Gaana blocks many hosting IPs).
+    music_provider: Literal["audius", "gaana"] = "audius"
+    audius_base_url: str = "https://api.audius.co/v1"
+    # Audius asks every client to identify itself with an app name.
+    audius_app_name: str = "Melodia"
     gaanapy_base_url: str = "http://localhost:8001"
     provider_timeout_seconds: float = 30.0
     # Retries only cover GaanaPy itself being unreachable. When Gaana refuses a request

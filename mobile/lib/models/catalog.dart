@@ -222,13 +222,18 @@ class SearchResults {
 }
 
 class StreamInfo {
-  const StreamInfo({required this.url, required this.quality, required this.bitrateKbps, this.expiresAt, this.availableQualities = const []});
+  const StreamInfo({required this.url, required this.quality, required this.bitrateKbps, this.expiresAt, this.availableQualities = const [], this.format = 'hls'});
 
   final String url;
   final String quality;
   final int bitrateKbps;
   final DateTime? expiresAt;
   final List<String> availableQualities;
+
+  /// `hls` (Gaana) or a progressive file type such as `mp3` (Audius).
+  final String format;
+
+  bool get isHls => format == 'hls';
 
   /// Treat a URL as stale two minutes before the provider token expires.
   bool get isStale => expiresAt != null && DateTime.now().toUtc().isAfter(expiresAt!.subtract(const Duration(minutes: 2)));
@@ -239,6 +244,7 @@ class StreamInfo {
         bitrateKbps: (j['bitrate_kbps'] as num).toInt(),
         expiresAt: j['expires_at'] == null ? null : DateTime.parse(j['expires_at'] as String).toUtc(),
         availableQualities: (j['available_qualities'] as List? ?? []).cast<String>(),
+        format: j['format'] as String? ?? 'hls',
       );
 }
 

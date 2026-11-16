@@ -21,7 +21,8 @@ from app.services.library_service import LibraryService
 router = APIRouter(tags=["music"])
 
 Seokey = Annotated[str, Path(min_length=1, max_length=200, pattern=r"^[A-Za-z0-9\-]+$")]
-NumericId = Annotated[str, Path(min_length=1, max_length=20, pattern=r"^[0-9]+$")]
+# Provider-side numeric id (Gaana: digits; Audius: short hash id).
+NumericId = Annotated[str, Path(min_length=1, max_length=20, pattern=r"^[A-Za-z0-9]+$")]
 Language = Annotated[str, Query(min_length=2, max_length=50, pattern=r"^[A-Za-z]+(?: [A-Za-z]+)*$")]
 
 
