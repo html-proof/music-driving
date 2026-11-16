@@ -6,6 +6,7 @@ import 'package:melodia/features/player/audio_handler.dart';
 import 'package:melodia/models/catalog.dart';
 import 'package:melodia/models/track.dart';
 import 'package:melodia/providers/core_providers.dart';
+import 'package:melodia/services/music_repository.dart';
 
 import 'audio_handler_test.dart' show FakeEngine;
 import 'widgets_test.dart' show makeHandler, pumpFrames;
@@ -165,4 +166,28 @@ void main() {
       expect(find.text(lyricsUnavailableMessage), findsOneWidget);
     });
   });
+
+  test('a failed lyrics request is not retried automatically', () async {
+    final repo = _FailingRepo();
+    final container = ProviderContainer(overrides: [musicRepositoryProvider.overrideWithValue(repo)]);
+    addTearDown(container.dispose);
+    final sub = container.listen(lyricsProvider('a'), (_, _) {});
+    addTearDown(sub.close);
+    await expectLater(container.read(lyricsProvider('a').future), throwsA(anything));
+    // Riverpod's default policy would retry after ~200 ms, then 400 ms, ...
+    await Future<void>.delayed(const Duration(milliseconds: 1500));
+    expect(repo.lyricsCalls, 1);
+  });
+}
+
+class _FailingRepo implements MusicRepository {
+  int lyricsCalls = 0;
+  @override
+  Future<Lyrics> lyrics(String songId) async {
+    lyricsCalls++;
+    throw Exception('Music provider is currently unavailable');
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

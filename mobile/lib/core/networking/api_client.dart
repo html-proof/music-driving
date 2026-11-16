@@ -83,13 +83,18 @@ class ApiClient {
       }
     }
 
-    // Retry GETs on network errors / 502-504 with exponential backoff.
+    // Retry GETs on network errors / gateway errors with exponential backoff. A 503 that
+    // our backend produced itself (JSON `detail`, e.g. "Music provider is currently
+    // unavailable") is a definite answer: retrying it only adds load on the provider
+    // while it is blocking us, so it is returned straight away.
     final retries = (req.extra[_retryKey] as int?) ?? 0;
     final code = err.response?.statusCode;
+    final data = err.response?.data;
+    final backendSaidUnavailable = code == 503 && data is Map && data['detail'] != null;
     final transient = err.type == DioExceptionType.connectionError ||
         err.type == DioExceptionType.connectionTimeout ||
         err.type == DioExceptionType.receiveTimeout ||
-        (code != null && code >= 502 && code <= 504);
+        (code != null && code >= 502 && code <= 504 && !backendSaidUnavailable);
     if (req.method == 'GET' && transient && retries < 2 && !(req.cancelToken?.isCancelled ?? false)) {
       req.extra[_retryKey] = retries + 1;
       await Future.delayed(Duration(milliseconds: 400 * (1 << retries)));

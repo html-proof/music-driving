@@ -10,7 +10,13 @@ import '../player/player_providers.dart';
 
 /// Lyrics for one catalogue song id. A new id (track change) is a new provider
 /// instance, so lyrics always reload for the song that is actually playing.
-final lyricsProvider = FutureProvider.family<Lyrics, String>((ref, songId) => ref.read(musicRepositoryProvider).lyrics(songId));
+/// No automatic retry: a failure is almost always the provider being down/blocking us,
+/// and Riverpod's default backoff retries would keep hammering it. The panel shows
+/// "Try again" instead, and a new song asks again anyway.
+final lyricsProvider = FutureProvider.family<Lyrics, String>(
+  (ref, songId) => ref.read(musicRepositoryProvider).lyrics(songId),
+  retry: (_, _) => null,
+);
 
 const lyricsUnavailableMessage = 'Lyrics are currently unavailable.';
 

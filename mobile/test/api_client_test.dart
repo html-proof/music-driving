@@ -33,6 +33,12 @@ class FakeBackend implements HttpClientAdapter {
         return _json(201, {..._tokens(), 'created': true});
       case '/auth/refresh':
         return refreshRejected ? _json(401, {'detail': 'Refresh token has expired'}) : _json(200, _tokens());
+      case '/lyrics/provider-down':
+        // What our backend returns while Gaana is blocking us.
+        return _json(503, {'detail': 'Music provider is currently unavailable'});
+      case '/gateway-hiccup':
+        // A proxy/gateway error (no JSON body): genuinely transient.
+        return ResponseBody.fromString('Bad Gateway', 502, headers: {Headers.contentTypeHeader: ['text/plain']});
       default:
         final auth = o.headers['Authorization'];
         if (auth != 'Bearer $validAccess') return _json(401, {'detail': 'Invalid or expired access token'});
@@ -94,5 +100,19 @@ void main() {
     expect(result['ok'], isTrue);
     expect(backend.deviceLogins, hasLength(2));
     expect(backend.deviceLogins.last['device_id'], firstCreds['device_id']); // same account
+  });
+
+  test('a backend 503 ("provider unavailable") is not retried', () async {
+    await api.ensureSession();
+    backend.calls.clear();
+    await expectLater(api.get<dynamic>('/lyrics/provider-down'), throwsA(anything));
+    expect(backend.calls.where((c) => c == 'GET /lyrics/provider-down'), hasLength(1));
+  });
+
+  test('a gateway 502 is still retried (twice)', () async {
+    await api.ensureSession();
+    backend.calls.clear();
+    await expectLater(api.get<dynamic>('/gateway-hiccup'), throwsA(anything));
+    expect(backend.calls.where((c) => c == 'GET /gateway-hiccup'), hasLength(3));
   });
 }
