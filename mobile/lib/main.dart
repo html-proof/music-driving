@@ -12,6 +12,7 @@ import 'core/storage/token_storage.dart';
 import 'core/theme/app_theme.dart';
 import 'features/player/audio_engine.dart';
 import 'features/player/audio_handler.dart';
+import 'features/player/audio_service_config.dart';
 import 'providers/core_providers.dart';
 import 'routing/app_router.dart';
 import 'services/music_repository.dart';
@@ -40,26 +41,7 @@ Future<void> main() async {
       reporter: playbackRepo,
       store: PrefsQueueStore(prefs),
     ),
-    // A single MediaSession + foreground service: the native media notification,
-    // lock screen, Now Playing (iOS) and media buttons are all derived from it,
-    // so there is never a second (duplicate) notification.
-    config: const AudioServiceConfig(
-      androidNotificationChannelId: 'com.melodia.app.playback',
-      androidNotificationChannelName: 'Playback',
-      androidNotificationChannelDescription: 'Media controls for the song that is playing',
-      androidNotificationIcon: 'drawable/ic_stat_music',
-      // Ongoing while playing; when paused the service leaves the foreground so the
-      // user can swipe the notification away (which stops playback).
-      androidNotificationOngoing: true,
-      androidStopForegroundOnPause: true,
-      // Some OEM skins only draw the notification seek bar with a solid colour.
-      notificationColor: Color(0xFF121212),
-      // audio_service publishes the new title/artist immediately and the new cover
-      // once downloaded (stale downloads are dropped), so a cover never belongs to
-      // the previous song. Downscale to keep the MediaSession bitmap small.
-      artDownscaleWidth: 512,
-      artDownscaleHeight: 512,
-    ),
+    config: melodiaAudioServiceConfig,
   );
   await handler.init();
 

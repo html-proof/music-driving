@@ -37,11 +37,17 @@ class JustAudioEngine implements AudioEngine {
   // handleInterruptions: false — MelodiaAudioHandler owns interruption, ducking and
   // "becoming noisy" handling. Leaving just_audio's own handling on would react to every
   // phone call / unplug twice and could resume audio the handler decided to keep paused.
-  JustAudioEngine([AudioPlayer? player]) : _player = player ?? AudioPlayer(handleInterruptions: false) {
+  //
+  // [sourceFor] exists only for the on-device test harness (plain files instead of HLS);
+  // production always uses the HLS default.
+  JustAudioEngine([AudioPlayer? player, AudioSource Function(Uri uri)? sourceFor])
+      : _player = player ?? AudioPlayer(handleInterruptions: false),
+        _sourceFor = sourceFor ?? HlsAudioSource.new {
     _player.errorStream.listen(_errors.add);
   }
 
   final AudioPlayer _player;
+  final AudioSource Function(Uri uri) _sourceFor;
   final _errors = StreamController<Object>.broadcast();
 
   static EngineState _map(ProcessingState s) => switch (s) {
@@ -82,7 +88,7 @@ class JustAudioEngine implements AudioEngine {
   Future<Duration?> setUrl(String url, {Duration? initialPosition}) =>
       // Provider streams are HLS (.m3u8); declare it explicitly so detection never
       // depends on the URL's query string.
-      _player.setAudioSource(HlsAudioSource(Uri.parse(url)), initialPosition: initialPosition);
+      _player.setAudioSource(_sourceFor(Uri.parse(url)), initialPosition: initialPosition);
 
   @override
   Future<void> play() async {
