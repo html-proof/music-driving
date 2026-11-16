@@ -138,6 +138,9 @@ class HomeFeed(BaseModel):
     languages: list[str]
     sections: list[HomeSection]
     errors: dict[str, str] = {}
+    # Languages whose songs could not be loaded right now (provider busy / blocking, and
+    # no earlier copy to fall back on); the app tells the user instead of hiding them.
+    unavailable_languages: list[str] = []
 
 
 class NewReleases(BaseModel):

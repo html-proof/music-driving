@@ -12,6 +12,7 @@ from api import endpoints
 from api.functions import Functions
 from api.errors import Errors
 from api.discovery.discovery import Discovery
+from api.songcache import SongCache
 
 class GaanaPy(Songs, Albums, Artists, Trending, NewReleases, Charts, Playlists, Discovery):
     def __init__(self):
@@ -25,6 +26,8 @@ class GaanaPy(Songs, Albums, Artists, Trending, NewReleases, Charts, Playlists, 
         # of 20 songs is 21 requests). Firing them all at once is what gets clients
         # rate-limited and blocked, so cap how many are in flight together.
         self._gate = asyncio.Semaphore(max(1, int(os.getenv("GAANA_MAX_CONCURRENT", "4"))))
+        # ...and remember song details, so a song already listed costs nothing next time.
+        self.song_cache = SongCache()
 
     async def _safe_request(self, method: str, url: str, **kwargs) -> dict:
         async with self._gate:

@@ -92,7 +92,8 @@ async def songs_search(
 async def songs_info(
     seokey: str = Depends(validate_seokey)
 ):
-    song_info = await gaanapy.get_track_info([seokey])
+    # Direct lookups renew stream links, so they always go to Gaana.
+    song_info = await gaanapy.get_track_info([seokey], fresh=True)
     if isinstance(song_info, dict) and "error" in song_info:
         raise HTTPException(status_code=404, detail=song_info["error"])
     return song_info

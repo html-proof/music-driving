@@ -72,7 +72,7 @@ A known `device_id` with the wrong secret gets `401`.
 
 | Method | Path | Notes |
 |---|---|---|
-| GET | `/home?languages=English,Hindi` | Sections: recently played, made for you, trending, new releases, charts, trending artists, regional. Per-section provider failures are listed in `errors`. |
+| GET | `/home?languages=English,Hindi` | Sections: recently played, made for you, trending, new releases, charts, trending artists, regional. Per-section provider failures are listed in `errors`; languages whose songs could not be loaded (provider busy, no earlier copy) are listed in `unavailable_languages`. |
 | GET | `/search?q=&limit=10&save=false` | `{songs, albums, artists, playlists, errors}`. `save=true` stores the query in search history (signed in). |
 | GET | `/songs/{seokey}` | Track |
 | GET | `/albums/{seokey}` | Album with tracks |
@@ -80,7 +80,7 @@ A known `device_id` with the wrong secret gets `401`.
 | GET | `/artists/{seokey}?limit=10` | Artist, top tracks, similar artists, `is_followed` |
 | GET | `/artists/{artist_id}/tracks?page=1&limit=20` | Numeric artist id; `{items, page, limit, has_more}` |
 | GET | `/playlists/{seokey}` | Provider/chart playlist with tracks |
-| GET | `/trending?language=` | Defaults to the user's first language |
+| GET | `/trending?language=&limit=` | Defaults to the user's first language; `limit` defaults to the home row size and shares one cached fetch per language |
 | GET | `/new-releases?language=` | `{language, tracks, albums}` |
 | GET | `/charts?limit=20` | Chart playlists |
 | GET | `/recommendations` 🔒 | Rule-based; `personalized: false` with an explanation when there is no listening data yet |

@@ -58,6 +58,8 @@ class HomeScreen extends ConsumerWidget {
                       child: Text('Offline — showing what you saw last time.', style: TextStyle(color: AppColors.textSecondary)),
                     ),
                   ),
+                if (home.unavailableLanguages.isNotEmpty && home.sections.isNotEmpty)
+                  SliverToBoxAdapter(child: UnavailableLanguagesNotice(languages: home.unavailableLanguages)),
                 if (home.sections.isEmpty)
                   SliverFillRemaining(
                     child: ErrorView(
@@ -74,6 +76,32 @@ class HomeScreen extends ConsumerWidget {
           ]),
         ),
       ),
+    );
+  }
+}
+
+/// Shown when some of the user's languages couldn't be loaded, so their songs don't
+/// just silently go missing from Home.
+class UnavailableLanguagesNotice extends StatelessWidget {
+  const UnavailableLanguagesNotice({super.key, required this.languages});
+  final List<String> languages;
+
+  static String message(List<String> languages) {
+    final names = languages.length == 1
+        ? languages.first
+        : '${languages.sublist(0, languages.length - 1).join(', ')} and ${languages.last}';
+    return '$names songs couldn\'t load right now — the music service is busy. Pull down to try again in a few minutes.';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Icon(Icons.info_outline, size: 18, color: AppColors.textSecondary),
+        const SizedBox(width: 8),
+        Expanded(child: Text(message(languages), style: const TextStyle(color: AppColors.textSecondary))),
+      ]),
     );
   }
 }

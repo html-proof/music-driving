@@ -96,13 +96,15 @@ async def provider_playlist(seokey: Seokey, catalog: Catalog) -> PlaylistDetail:
 
 @router.get("/trending", response_model=list[Track])
 async def trending(catalog: Catalog, user: OptionalUser, language: Language | None = None,
-                   limit: Annotated[int, Query(ge=1, le=50)] = 20) -> list[Track]:
+                   limit: Annotated[int | None, Query(ge=1, le=50, description="Defaults to the home row size")] = None,
+                   ) -> list[Track]:
     return await catalog.trending(_lang(language, user, catalog), limit)
 
 
 @router.get("/new-releases", response_model=NewReleases)
 async def new_releases(catalog: Catalog, user: OptionalUser, language: Language | None = None,
-                       limit: Annotated[int, Query(ge=1, le=50)] = 20) -> NewReleases:
+                       limit: Annotated[int | None, Query(ge=1, le=50, description="Defaults to the home row size")] = None,
+                       ) -> NewReleases:
     return await catalog.new_releases(_lang(language, user, catalog), limit)
 
 

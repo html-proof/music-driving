@@ -107,7 +107,8 @@ class RecommendationService:
             key, numeric, name = top_artists[0]
             jobs.append((f"similar:{name}", self.catalog.similar_artists_for(numeric)))
         for lang in langs:
-            jobs.append((f"Trending in {lang}", self.catalog.trending(lang, 30)))
+            # Same list the home feed shows (one cached fetch per language, no extra Gaana calls).
+            jobs.append((f"Trending in {lang}", self.catalog.trending(lang)))
 
         results = await asyncio.gather(*[j for _, j in jobs], return_exceptions=True)
         buckets: list[list[Recommendation]] = []

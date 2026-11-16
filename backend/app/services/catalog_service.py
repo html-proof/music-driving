@@ -49,14 +49,17 @@ class CatalogService:
         self.settings = settings
         self._probe = http_probe  # async (url) -> bool, used to verify stream qualities
 
-    async def _cached(self, key: str, ttl: int, adapter: TypeAdapter, factory: Callable[[], Awaitable[T]]) -> T:
+    async def _cached(self, key: str, ttl: int, adapter: TypeAdapter, factory: Callable[[], Awaitable[T]],
+                      stale_key: str | None = None) -> T:
         """Cache-first provider call that keeps Gaana traffic down:
 
         * a fresh copy is served for `ttl`;
         * a "not found" answer is remembered, so missing items aren't re-requested;
         * the last good copy is kept much longer and served while the provider is
           unavailable (blocked / rate-limited), so pages don't go blank during a block.
+          `stale_key` lets several request shapes (e.g. list sizes) share that copy.
         """
+        stale_key = f"stale:{stale_key or key}"
         hit = await self.cache.get(key)
         if hit is not None:
             try:
@@ -71,7 +74,7 @@ class CatalogService:
             await self.cache.set(f"miss:{key}", True, self.settings.not_found_cache_ttl_seconds)
             raise
         except ProviderUnavailable:
-            stale = await self.cache.get(f"stale:{key}")
+            stale = await self.cache.get(stale_key)
             if stale is not None:
                 try:
                     log.info("provider unavailable: serving last good copy of %s", key)
@@ -81,7 +84,7 @@ class CatalogService:
             raise
         dumped = adapter.dump_python(value, mode="json")
         await self.cache.set(key, dumped, ttl)
-        await self.cache.set(f"stale:{key}", dumped, self.settings.stale_cache_ttl_seconds)
+        await self.cache.set(stale_key, dumped, self.settings.stale_cache_ttl_seconds)
         return value
 
     def _known(self, song_id: str) -> ProviderTrack | None:
@@ -234,13 +237,31 @@ class CatalogService:
                                   TypeAdapter(TrackPage),
                                   lambda: self.provider.artist_tracks(artist_numeric_id, limit, page))
 
-    async def trending(self, language: str, limit: int = 20) -> list[Track]:
-        return await self._cached(f"trending:{language}:{limit}", self._home_ttl(), TypeAdapter(list[Track]),
-                                  lambda: self.provider.trending(language, limit))
+    def _list_size(self, limit: int | None) -> int:
+        """Language lists are fetched at one standard size (the home row) and trimmed.
 
-    async def new_releases(self, language: str, limit: int = 20) -> NewReleases:
-        return await self._cached(f"new:{language}:{limit}", self._home_ttl(), TypeAdapter(NewReleases),
-                                  lambda: self.provider.new_releases(language, limit))
+        Each listed song costs a Gaana request, so the home feed, "Made for you" and
+        /trending asking for 12, 20 or 30 songs of the same language must not each
+        fetch their own copy: that multiplied traffic until Gaana blocked us and the
+        regional rows disappeared.
+        """
+        size = self.settings.home_section_size
+        return size if limit is None or limit <= size else limit
+
+    async def trending(self, language: str, limit: int | None = None) -> list[Track]:
+        n = self._list_size(limit)
+        lang = language.strip().lower()
+        tracks = await self._cached(f"trending:{lang}:{n}", self._home_ttl(), TypeAdapter(list[Track]),
+                                    lambda: self.provider.trending(language, n), stale_key=f"trending:{lang}")
+        return tracks[: limit or n]
+
+    async def new_releases(self, language: str, limit: int | None = None) -> NewReleases:
+        n = self._list_size(limit)
+        lang = language.strip().lower()
+        new = await self._cached(f"new:{lang}:{n}", self._home_ttl(), TypeAdapter(NewReleases),
+                                 lambda: self.provider.new_releases(language, n), stale_key=f"new:{lang}")
+        k = limit or n
+        return new.model_copy(update={"tracks": new.tracks[:k], "albums": new.albums[:k]})
 
     async def charts(self, limit: int = 20) -> list[PlaylistSummary]:
         return await self._cached(f"charts:{limit}", self._home_ttl(), TypeAdapter(list[PlaylistSummary]),

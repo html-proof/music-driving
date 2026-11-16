@@ -74,6 +74,7 @@ class HomeService:
                 errors["made_for_you"] = str(exc)
 
         trending_tracks: list[Track] = []
+        unavailable: list[str] = []
         for i, lang in enumerate(langs[:3]):
             res = results[f"trending:{lang}"]
             if isinstance(res, list) and res:
@@ -87,6 +88,7 @@ class HomeService:
                 ))
             elif isinstance(res, BaseException) and not isinstance(res, ProviderNotFound):
                 errors[f"trending_{lang.lower()}"] = _msg(res)
+                unavailable.append(lang)
 
         new = results[f"new:{langs[0]}"]
         if not isinstance(new, BaseException):
@@ -129,6 +131,7 @@ class HomeService:
             languages=langs,
             sections=sections,
             errors=errors,
+            unavailable_languages=unavailable,
         )
 
 

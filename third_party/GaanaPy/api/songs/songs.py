@@ -18,21 +18,37 @@ class Songs:
         track_info = await self.get_track_info(track_ids)
         return track_info
 
-    async def get_track_info(self, track_id: list) -> list:
+    async def get_track_info(self, track_id: list, fresh: bool = False) -> list:
+        """Song details for each seokey, in order.
+
+        Local fix: every list (trending, new releases, search, albums, artists) is built
+        from one songDetail request per song, which is what gets clients blocked. Details
+        are remembered (see SongCache), so the same song showing up in several lists or
+        in the next hourly refresh costs no new request. `fresh=True` bypasses the
+        cache (direct song lookups, used to renew stream links).
+        """
         endpoints = self.api_endpoints
         errors = self.errors
+        cache = getattr(self, "song_cache", None)
+        known = {} if fresh or cache is None else cache.get_many(track_id)
+        missing = list(dict.fromkeys(i for i in track_id if i not in known))
         results = await asyncio.gather(*[
             self._safe_request("POST", endpoints.song_details_url + i)
-            for i in track_id
+            for i in missing
         ])
-        track_info = []
-        for result in results:
+        fetched = {}
+        for seokey, result in zip(missing, results):
             if isinstance(result, dict) and "error" in result:
                 continue
             tracks = result.get('tracks')
             if not tracks:
                 continue
-            track_info.extend(await asyncio.gather(*[self.format_json_songs(t) for t in tracks]))
+            fetched[seokey] = await asyncio.gather(*[self.format_json_songs(t) for t in tracks])
+            if cache is not None:
+                cache.put(seokey, fetched[seokey])
+        track_info = []
+        for seokey in track_id:
+            track_info.extend(known.get(seokey) or fetched.get(seokey) or [])
         if len(track_info) == 0:
             return await errors.no_results()
         return track_info

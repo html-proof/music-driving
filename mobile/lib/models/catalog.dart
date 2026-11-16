@@ -179,17 +179,27 @@ class HomeSection {
 }
 
 class HomeFeed {
-  const HomeFeed({required this.greeting, required this.sections, this.errors = const {}, this.fromCache = false});
+  const HomeFeed({
+    required this.greeting,
+    required this.sections,
+    this.errors = const {},
+    this.unavailableLanguages = const [],
+    this.fromCache = false,
+  });
 
   final String greeting;
   final List<HomeSection> sections;
   final Map<String, String> errors;
+
+  /// Languages whose songs the music provider couldn't return right now.
+  final List<String> unavailableLanguages;
   final bool fromCache;
 
   factory HomeFeed.fromJson(Map<String, dynamic> j, {bool fromCache = false}) => HomeFeed(
         greeting: j['greeting'] as String,
         sections: (j['sections'] as List).map((e) => HomeSection.fromJson(e as Map<String, dynamic>)).toList(),
         errors: (j['errors'] as Map? ?? {}).cast<String, String>(),
+        unavailableLanguages: (j['unavailable_languages'] as List? ?? const []).cast<String>(),
         fromCache: fromCache,
       );
 }

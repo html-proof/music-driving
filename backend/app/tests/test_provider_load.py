@@ -172,6 +172,48 @@ async def test_home_is_served_from_the_last_good_copy_during_a_block(http, gaana
     assert any(s["id"] == "trending_english" for s in second["sections"]), second["errors"]
 
 
+async def test_each_language_list_is_fetched_once(http, gaana):
+    """Home, "Made for you" and /trending share one fetch per language.
+
+    They used to ask for 12, 30 and 20 songs and each fetched its own copy (one Gaana
+    request per song), which got the server blocked and blanked the regional rows.
+    """
+    h = auth(await register(http))
+    await http.post(f"{API}/playback/complete", headers=h, json={"song_id": "tyler-herro", "seconds_listened": 156})
+    gaana.calls.clear()
+    home = (await http.get(f"{API}/home", params={"languages": "English"}, headers=h)).json()
+    assert any(s["id"] == "made_for_you" for s in home["sections"]), home
+    for params in ({"language": "English"}, {"language": "English", "limit": 2}):
+        r = await http.get(f"{API}/trending", params=params, headers=h)
+        assert r.status_code == 200 and r.json(), r.text
+    assert len((await http.get(f"{API}/trending", params={"language": "English", "limit": 2})).json()) == 2
+    assert gaana.calls.count("/trending") == 1, gaana.calls
+    assert gaana.calls.count("/newreleases") == 1, gaana.calls
+
+
+async def test_last_good_copy_of_a_language_is_shared_across_list_sizes(http, gaana, prod_app):
+    # A bigger list of the language was loaded earlier (e.g. via /trending?limit=20)...
+    r = await http.get(f"{API}/trending", params={"language": "English", "limit": 20})
+    assert r.status_code == 200 and r.json()
+    cache = prod_app.state.catalog.cache
+    for key in [k for k in list(cache._data) if not k.startswith("stale:")]:
+        await cache.delete(key)
+    gaana.down = True
+    # ...so Home (a 12-song row) can still show it while Gaana blocks us.
+    home = (await http.get(f"{API}/home", params={"languages": "English"})).json()
+    row = next((s for s in home["sections"] if s["id"] == "trending_english"), None)
+    assert row and len(row["tracks"]) <= prod_app.state.catalog.settings.home_section_size, home["errors"]
+    assert home["unavailable_languages"] == []
+
+
+async def test_home_names_languages_it_could_not_load(http, gaana):
+    gaana.down = True
+    home = (await http.get(f"{API}/home", params={"languages": "Tamil,Punjabi"})).json()
+    assert not any(s["id"].startswith("trending_") for s in home["sections"])
+    # The first refusal starts the cooldown; the other language fails fast, but both are named.
+    assert home["unavailable_languages"] == ["Tamil", "Punjabi"]
+
+
 async def test_search(http, gaana):
     h = auth(await register(http))
     used = _measure(gaana)

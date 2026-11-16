@@ -1,0 +1,252 @@
+diff --git a/api/gaanapy.py b/api/gaanapy.py
+index c960308..102bce1 100644
+--- a/api/gaanapy.py
++++ b/api/gaanapy.py
+@@ -12,6 +12,7 @@ from api import endpoints
+ from api.functions import Functions
+ from api.errors import Errors
+ from api.discovery.discovery import Discovery
++from api.songcache import SongCache
+ 
+ class GaanaPy(Songs, Albums, Artists, Trending, NewReleases, Charts, Playlists, Discovery):
+     def __init__(self):
+@@ -25,6 +26,8 @@ class GaanaPy(Songs, Albums, Artists, Trending, NewReleases, Charts, Playlists,
+         # of 20 songs is 21 requests). Firing them all at once is what gets clients
+         # rate-limited and blocked, so cap how many are in flight together.
+         self._gate = asyncio.Semaphore(max(1, int(os.getenv("GAANA_MAX_CONCURRENT", "4"))))
++        # ...and remember song details, so a song already listed costs nothing next time.
++        self.song_cache = SongCache()
+ 
+     async def _safe_request(self, method: str, url: str, **kwargs) -> dict:
+         async with self._gate:
+diff --git a/api/songcache.py b/api/songcache.py
+new file mode 100644
+index 0000000..ab1afac
+--- /dev/null
++++ b/api/songcache.py
+@@ -0,0 +1,65 @@
++"""Local fix: remember formatted song details so lists don't re-request every song.
++
++An entry lives for GAANA_SONG_CACHE_SECONDS (default 1800), but never past its stream
++links' own expiry (Akamai `exp=` token) minus a safety margin, so a cached song can
++always still be played. Bounded by GAANA_SONG_CACHE_SIZE entries (least recently used
++dropped first).
++"""
++
++import os
++import re
++import time
++from collections import OrderedDict
++
++_EXP = re.compile(r"exp=(\d+)")
++STREAM_MARGIN_SECONDS = 900
++
++
++def _stream_expiry(records: list) -> float | None:
++    """Earliest stream-token expiry (epoch seconds) across the records, if any."""
++    found = []
++    for record in records:
++        urls = ((record or {}).get("stream_urls") or {}).get("urls") or {}
++        for url in urls.values():
++            match = _EXP.search(url) if isinstance(url, str) else None
++            if match:
++                found.append(float(match.group(1)))
++    return min(found) if found else None
++
++
++class SongCache:
++    def __init__(self, ttl: float | None = None, max_items: int | None = None, clock=time.time):
++        self.ttl = float(os.getenv("GAANA_SONG_CACHE_SECONDS", "1800")) if ttl is None else ttl
++        self.max_items = int(os.getenv("GAANA_SONG_CACHE_SIZE", "5000")) if max_items is None else max_items
++        self._clock = clock
++        self._data: OrderedDict[str, tuple[float, list]] = OrderedDict()
++
++    def get_many(self, seokeys: list) -> dict:
++        now = self._clock()
++        out = {}
++        for seokey in seokeys:
++            item = self._data.get(seokey)
++            if item is None:
++                continue
++            expires, records = item
++            if expires <= now:
++                self._data.pop(seokey, None)
++                continue
++            self._data.move_to_end(seokey)
++            out[seokey] = records
++        return out
++
++    def put(self, seokey: str, records: list) -> None:
++        if self.ttl <= 0 or self.max_items <= 0 or not records:
++            return
++        now = self._clock()
++        expires = now + self.ttl
++        stream_exp = _stream_expiry(records)
++        if stream_exp is not None:
++            expires = min(expires, stream_exp - STREAM_MARGIN_SECONDS)
++        if expires <= now:
++            return
++        self._data[seokey] = (expires, records)
++        self._data.move_to_end(seokey)
++        while len(self._data) > self.max_items:
++            self._data.popitem(last=False)
+diff --git a/api/songs/songs.py b/api/songs/songs.py
+index 0005c74..005635f 100644
+--- a/api/songs/songs.py
++++ b/api/songs/songs.py
+@@ -18,21 +18,37 @@ class Songs:
+         track_info = await self.get_track_info(track_ids)
+         return track_info
+ 
+-    async def get_track_info(self, track_id: list) -> list:
++    async def get_track_info(self, track_id: list, fresh: bool = False) -> list:
++        """Song details for each seokey, in order.
++
++        Local fix: every list (trending, new releases, search, albums, artists) is built
++        from one songDetail request per song, which is what gets clients blocked. Details
++        are remembered (see SongCache), so the same song showing up in several lists or
++        in the next hourly refresh costs no new request. `fresh=True` bypasses the
++        cache (direct song lookups, used to renew stream links).
++        """
+         endpoints = self.api_endpoints
+         errors = self.errors
++        cache = getattr(self, "song_cache", None)
++        known = {} if fresh or cache is None else cache.get_many(track_id)
++        missing = list(dict.fromkeys(i for i in track_id if i not in known))
+         results = await asyncio.gather(*[
+             self._safe_request("POST", endpoints.song_details_url + i)
+-            for i in track_id
++            for i in missing
+         ])
+-        track_info = []
+-        for result in results:
++        fetched = {}
++        for seokey, result in zip(missing, results):
+             if isinstance(result, dict) and "error" in result:
+                 continue
+             tracks = result.get('tracks')
+             if not tracks:
+                 continue
+-            track_info.extend(await asyncio.gather(*[self.format_json_songs(t) for t in tracks]))
++            fetched[seokey] = await asyncio.gather(*[self.format_json_songs(t) for t in tracks])
++            if cache is not None:
++                cache.put(seokey, fetched[seokey])
++        track_info = []
++        for seokey in track_id:
++            track_info.extend(known.get(seokey) or fetched.get(seokey) or [])
+         if len(track_info) == 0:
+             return await errors.no_results()
+         return track_info
+diff --git a/app.py b/app.py
+index 9b53902..0b2a1df 100644
+--- a/app.py
++++ b/app.py
+@@ -92,7 +92,8 @@ async def songs_search(
+ async def songs_info(
+     seokey: str = Depends(validate_seokey)
+ ):
+-    song_info = await gaanapy.get_track_info([seokey])
++    # Direct lookups renew stream links, so they always go to Gaana.
++    song_info = await gaanapy.get_track_info([seokey], fresh=True)
+     if isinstance(song_info, dict) and "error" in song_info:
+         raise HTTPException(status_code=404, detail=song_info["error"])
+     return song_info
+diff --git a/tests/test_song_cache.py b/tests/test_song_cache.py
+new file mode 100644
+index 0000000..787af63
+--- /dev/null
++++ b/tests/test_song_cache.py
+@@ -0,0 +1,93 @@
++"""Local fix: songs already looked up are not requested from Gaana again.
++
++Offline test (no Gaana traffic): the real request is replaced by a stub.
++"""
++
++import asyncio
++
++from api.gaanapy import GaanaPy
++from api.songcache import STREAM_MARGIN_SECONDS, SongCache
++
++
++def _detail(seokey: str) -> dict:
++    return {"tracks": [{"seokey": seokey, "track_title": seokey.title(), "artist": [], "urls": {}}]}
++
++
++def _run(coro_factory):
++    async def run():
++        g = GaanaPy()
++        try:
++            return await coro_factory(g)
++        finally:
++            await g.aiohttp.close()
++    return asyncio.run(run())
++
++
++def test_overlapping_lists_request_each_song_once():
++    requested = []
++
++    async def scenario(g):
++        async def stub(method, url, **kwargs):
++            seokey = url.rsplit("=", 1)[1]
++            requested.append(seokey)
++            return _detail(seokey)
++
++        g._request_now = stub
++        first = await g.get_track_info(["a", "b", "c"])
++        second = await g.get_track_info(["c", "d", "a"])  # e.g. the next list / hourly refresh
++        return first, second
++
++    first, second = _run(scenario)
++    assert [t["seokey"] for t in first] == ["a", "b", "c"]
++    assert [t["seokey"] for t in second] == ["c", "d", "a"]  # order kept
++    assert requested == ["a", "b", "c", "d"]
++
++
++def test_fresh_lookup_bypasses_cache():
++    requested = []
++
++    async def scenario(g):
++        async def stub(method, url, **kwargs):
++            requested.append(url)
++            return _detail(url.rsplit("=", 1)[1])
++
++        g._request_now = stub
++        await g.get_track_info(["a"])
++        await g.get_track_info(["a"], fresh=True)
++
++    _run(scenario)
++    assert len(requested) == 2
++
++
++def test_failed_lookup_is_not_remembered():
++    calls = []
++
++    async def scenario(g):
++        async def stub(method, url, **kwargs):
++            calls.append(url)
++            return {"error": "no results"} if len(calls) == 1 else _detail("a")
++
++        g._request_now = stub
++        await g.get_track_info(["a"])
++        return await g.get_track_info(["a"])
++
++    assert [t["seokey"] for t in _run(scenario)] == ["a"]
++    assert len(calls) == 2
++
++
++def test_entry_never_outlives_its_stream_links():
++    now = [1_000_000.0]
++    cache = SongCache(ttl=3600, max_items=10, clock=lambda: now[0])
++    exp = int(now[0] + STREAM_MARGIN_SECONDS + 60)  # links valid ~16 minutes
++    record = {"seokey": "a", "stream_urls": {"urls": {"medium_quality": f"https://x/a.mp4?hdnts=st=1~exp={exp}~acl=*"}}}
++    cache.put("a", [record])
++    assert cache.get_many(["a"])
++    now[0] += 61
++    assert cache.get_many(["a"]) == {}
++
++
++def test_cache_is_bounded():
++    cache = SongCache(ttl=3600, max_items=2)
++    for key in "abc":
++        cache.put(key, [{"seokey": key}])
++    assert set(cache.get_many(["a", "b", "c"])) == {"b", "c"}
