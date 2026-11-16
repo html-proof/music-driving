@@ -9,6 +9,8 @@ from sqlalchemy import text
 
 from app.config import Settings, get_settings
 from app.database import dispose_engine, get_engine, init_engine
+from app.integrations.audius.client import AudiusClient
+from app.integrations.audius.provider import AudiusProvider
 from app.integrations.errors import ProviderNotFound, ProviderUnavailable
 from app.integrations.gaanapy.client import GaanaPyClient
 from app.integrations.gaanapy.provider import GaanaProvider
@@ -44,16 +46,20 @@ def create_app(settings: Settings | None = None, provider=None, lyrics: LyricsSe
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         init_engine(settings.database_url)
-        cache = build_cache(settings.redis_url)
+        cache = build_cache(settings.redis_url, namespace=provider.name if provider else settings.music_provider)
         probe_client = httpx.AsyncClient(follow_redirects=True)
-        gaana_client = None
+        provider_client = None
         prov = provider
-        if prov is None:
-            gaana_client = GaanaPyClient(settings.gaanapy_base_url, settings.provider_timeout_seconds,
-                                         settings.provider_retries,
-                                         block_cooldown_seconds=settings.provider_block_cooldown_seconds,
-                                         block_cooldown_max_seconds=settings.provider_block_cooldown_max_seconds)
-            prov = GaanaProvider(gaana_client)
+        if prov is None and settings.music_provider == "audius":
+            provider_client = AudiusClient(settings.audius_base_url, settings.audius_app_name,
+                                           settings.provider_timeout_seconds, settings.provider_retries)
+            prov = AudiusProvider(provider_client)
+        elif prov is None:
+            provider_client = GaanaPyClient(settings.gaanapy_base_url, settings.provider_timeout_seconds,
+                                            settings.provider_retries,
+                                            block_cooldown_seconds=settings.provider_block_cooldown_seconds,
+                                            block_cooldown_max_seconds=settings.provider_block_cooldown_max_seconds)
+            prov = GaanaProvider(provider_client)
         app.state.settings = settings
         app.state.cache = cache
         app.state.provider = prov
@@ -62,8 +68,8 @@ def create_app(settings: Settings | None = None, provider=None, lyrics: LyricsSe
                                                    settings.lyrics_enabled)
         yield
         await probe_client.aclose()
-        if gaana_client:
-            await gaana_client.close()
+        if provider_client:
+            await provider_client.close()
         if lyrics is None:
             await app.state.lyrics.close()
         await cache.close()

@@ -23,7 +23,8 @@ abstract class AudioEngine {
   double get speed;
   EngineState get state;
 
-  Future<Duration?> setUrl(String url, {Duration? initialPosition});
+  /// [hls] is false for progressive files (Audius serves one MP3 per track).
+  Future<Duration?> setUrl(String url, {Duration? initialPosition, bool hls = true});
   Future<void> play();
   Future<void> pause();
   Future<void> seek(Duration position);
@@ -38,16 +39,16 @@ class JustAudioEngine implements AudioEngine {
   // "becoming noisy" handling. Leaving just_audio's own handling on would react to every
   // phone call / unplug twice and could resume audio the handler decided to keep paused.
   //
-  // [sourceFor] exists only for the on-device test harness (plain files instead of HLS);
-  // production always uses the HLS default.
+  // [sourceFor] exists only for the on-device test harness (plain files instead of
+  // provider streams); production picks HLS or progressive per stream.
   JustAudioEngine([AudioPlayer? player, AudioSource Function(Uri uri)? sourceFor])
       : _player = player ?? AudioPlayer(handleInterruptions: false),
-        _sourceFor = sourceFor ?? HlsAudioSource.new {
+        _sourceFor = sourceFor {
     _player.errorStream.listen(_errors.add);
   }
 
   final AudioPlayer _player;
-  final AudioSource Function(Uri uri) _sourceFor;
+  final AudioSource Function(Uri uri)? _sourceFor;
   final _errors = StreamController<Object>.broadcast();
 
   static EngineState _map(ProcessingState s) => switch (s) {
@@ -85,10 +86,13 @@ class JustAudioEngine implements AudioEngine {
   EngineState get state => _map(_player.processingState);
 
   @override
-  Future<Duration?> setUrl(String url, {Duration? initialPosition}) =>
-      // Provider streams are HLS (.m3u8); declare it explicitly so detection never
-      // depends on the URL's query string.
-      _player.setAudioSource(_sourceFor(Uri.parse(url)), initialPosition: initialPosition);
+  Future<Duration?> setUrl(String url, {Duration? initialPosition, bool hls = true}) {
+    // Declare the container explicitly so detection never depends on the URL: Gaana
+    // streams are HLS (.m3u8), Audius streams a redirect to a plain MP3.
+    final uri = Uri.parse(url);
+    final source = _sourceFor?.call(uri) ?? (hls ? HlsAudioSource(uri) : ProgressiveAudioSource(uri));
+    return _player.setAudioSource(source, initialPosition: initialPosition);
+  }
 
   @override
   Future<void> play() async {

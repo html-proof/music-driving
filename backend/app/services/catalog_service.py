@@ -125,6 +125,10 @@ class CatalogService:
         return results
 
     async def _search_playlists(self, q: str, limit: int) -> list[PlaylistSummary]:
+        search = getattr(self.provider, "search_playlists", None)
+        if search is not None:
+            return await self._cached(f"search:playlists:{q.lower()}:{limit}", self.settings.search_cache_ttl_seconds,
+                                      TypeAdapter(list[PlaylistSummary]), lambda: search(q, limit))
         # GaanaPy has no playlist search; match against the live chart playlists instead.
         words = q.lower().split()
         charts = await self.charts(100)
@@ -286,6 +290,7 @@ class CatalogService:
             quality=chosen,
             requested_quality=quality,
             url=url,
+            format=getattr(self.provider, "stream_format", "hls"),
             bitrate_kbps=QUALITY_BITRATE_KBPS[chosen],
             expires_at=stream_expiry(url),
             available_qualities=available,
@@ -300,8 +305,10 @@ class CatalogService:
         return False
 
     async def _verify(self, song_id: str, quality: AudioQuality, url: str) -> bool:
-        """GaanaPy derives some quality URLs by string substitution, so check they exist."""
-        if not self.settings.verify_stream_quality or self._probe is None:
+        """GaanaPy derives some quality URLs by string substitution, so check they exist.
+        Providers with a single stream per track opt out (`verify_streams = False`)."""
+        if (not self.settings.verify_stream_quality or self._probe is None
+                or not getattr(self.provider, "verify_streams", True)):
             return True
         key = f"streamcheck:{song_id}:{quality.value}"
         hit = await self.cache.get(key)

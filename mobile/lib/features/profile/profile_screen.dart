@@ -154,7 +154,7 @@ class ProfileScreen extends ConsumerWidget {
           child: Text(
             'No sign-in needed: your library is tied to this device. Uninstalling the app '
             'or clearing its data starts a new, empty library.\n\n'
-            'Music catalogue and streams are provided by Gaana via the unofficial GaanaPy API. '
+            'Music and streams from Audius (audius.co), uploaded by the artists. '
             'Lyrics from LRCLIB.',
             style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Release builds shrink unused resources. audio_service looks these drawables up by name
+  at runtime (AudioServiceConfig.androidNotificationIcon and MediaControl.androidIcon),
+  so the shrinker can't see they are used. Without this file the notification has no
+  small icon, and Android kills the app ("Invalid notification") as soon as playback starts.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_music,@drawable/audio_service_*" />
