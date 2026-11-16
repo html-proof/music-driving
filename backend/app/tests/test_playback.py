@@ -31,6 +31,13 @@ async def test_stream_uses_user_preferred_quality(client):
     assert s["quality"] == "medium"
 
 
+async def test_unknown_song_stream_says_unavailable_not_search_error(client):
+    h = auth(await register(client))
+    r = await client.get(f"{API}/playback/stream/missing-song", headers=h)
+    assert r.status_code == 404
+    assert r.json()["detail"] == "This song isn't available to stream"
+
+
 async def test_stream_requires_auth(client):
     assert (await client.get(f"{API}/playback/stream/tyler-herro")).status_code == 401
 

@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Path, Query, Response, status
 
 from app.dependencies import DB, Catalog, CurrentUser, Lyrics
+from app.integrations.errors import ProviderNotFound
 from app.schemas.library import CompleteIn, PlaybackSessionIn, PlaybackSessionOut, ProgressIn, QueueOut
 from app.schemas.lyrics import Lyrics as LyricsOut
 from app.schemas.music import AudioQuality, StreamInfo
@@ -26,7 +27,12 @@ async def stream(song_id: SongId, user: CurrentUser, catalog: Catalog,
     """Resolve a fresh, verified HLS URL. The app streams directly from the provider CDN;
     the backend never proxies or stores audio. Call again before `expires_at`."""
     q = quality or AudioQuality(user.preferences.audio_quality if user.preferences else "high")
-    return await catalog.stream(song_id, q)
+    try:
+        return await catalog.stream(song_id, q)
+    except ProviderNotFound as exc:
+        # The provider's own wording ("Unable to find any results!") reads like a search
+        # error in the player; say what it means for this song.
+        raise ProviderNotFound("This song isn't available to stream") from exc
 
 
 @router.post("/playback/progress", response_model=PlaybackSessionOut | None)
