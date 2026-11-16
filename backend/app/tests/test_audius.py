@@ -161,7 +161,10 @@ async def test_home_has_a_row_per_language(audius_client, fake_audius):
     assert rows["trending_tamil"]["subtitle"] == "Regional picks"
     # English: Audius's all-genre trending, titled sensibly when it isn't the first row.
     assert rows["trending_all"]["title"] == "Trending worldwide"
+    assert rows["trending_all"]["subtitle"] is None
     assert rows["trending_all"]["tracks"][0]["id"] == TRACK_ID
+    # Audius's albums / underground rows are global, so they don't claim the first language.
+    assert rows["new_albums"]["subtitle"] is None and rows["new_tracks"]["subtitle"] is None
     searches = [c.url.params for c in f.calls if c.url.path == "/v1/tracks/search"]
     assert {p["query"] for p in searches} == {"hindi", "bollywood", "tamil", "kollywood"}
     assert all(p["sort_method"] == "popular" for p in searches)

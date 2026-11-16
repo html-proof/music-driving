@@ -92,7 +92,8 @@ class HomeService:
                 sections.append(HomeSection(
                     id=f"trending_{lang.lower()}",
                     title="Trending now" if i == 0 else (f"Popular in {lang}" if label(lang) else "Trending worldwide"),
-                    subtitle=label(lang) if i == 0 else ("Regional picks" if is_language(lang) else "Genre picks"),
+                    subtitle=label(lang) if i == 0 or not label(lang)
+                    else ("Regional picks" if is_language(lang) else "Genre picks"),
                     type="tracks", tracks=tracks,
                 ))
             elif isinstance(res, BaseException) and not isinstance(res, ProviderNotFound):
@@ -100,14 +101,16 @@ class HomeService:
                 unavailable.append(label(lang) or "Trending")
 
         new = results[f"new:{feeds[0]}"]
+        # Gaana's new releases follow the language; Audius's are global (not per feed).
+        new_label = feeds[0] if by_language else None
         if not isinstance(new, BaseException):
             if new.albums:
                 sections.append(HomeSection(id="new_albums", title=titles.get("new_albums", "New releases"),
-                                            subtitle=label(feeds[0]),
+                                            subtitle=new_label,
                                             type="albums", albums=new.albums))
             if new.tracks:
                 sections.append(HomeSection(id="new_tracks", title=titles.get("new_tracks", "New songs"),
-                                            subtitle=label(feeds[0]),
+                                            subtitle=new_label,
                                             type="tracks", tracks=_filter_explicit(new.tracks, allow_explicit)))
         elif not isinstance(new, ProviderNotFound):
             errors["new_releases"] = _msg(new)
