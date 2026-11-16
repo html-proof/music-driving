@@ -1,5 +1,7 @@
 """User-owned playlists. Mutations lock the playlist row so concurrent edits keep positions consistent."""
 
+from __future__ import annotations
+
 import asyncio
 import uuid
 

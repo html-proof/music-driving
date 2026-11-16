@@ -70,3 +70,9 @@ services:
 volumes:
   pgdata:
   certbot-www:
+
+# Own bridge network, so the stack stays apart from other containers on the server.
+networks:
+  default:
+    name: melodia-net
+    driver: bridge

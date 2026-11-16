@@ -82,6 +82,19 @@ The backend container runs `alembic upgrade head` on start, then serves with uvi
    client, then place `fullchain.pem` and `privkey.pem` in `deploy/certs/`.
 3. `docker compose restart nginx`. Renew with a cron job (`certbot renew` + `nginx -s reload`).
 
+### Behind a Cloudflare Tunnel (no public ports)
+On a host that already runs other sites (or has no free 80/443), let Cloudflare terminate TLS and reach
+nginx through a tunnel instead:
+```bash
+cloudflared tunnel create melodia                        # once, from a machine logged in to the zone
+cloudflared tunnel route dns melodia api.example.com     # hostname must be in that login's zone
+cloudflared tunnel token melodia                         # put it in .env as CLOUDFLARE_TUNNEL_TOKEN
+docker compose -f docker-compose.yml -f docker-compose.cloudflare.yml up -d --build
+```
+nginx then uses `deploy/nginx/nginx.tunnel.conf` (plain HTTP on the compose network, real client IP from
+`CF-Connecting-IP`) and publishes no host ports. The stack runs on its own `melodia-net` network.
+`cloudflared tunnel route dns` appends its own zone to names outside it, so check the name it prints.
+
 ### Environment variables
 See `backend/.env.example` (all backend settings) and `.env.example` (compose). Key ones:
 
@@ -129,7 +142,10 @@ Keep backups off the server and test a restore regularly. Redis only holds cache
 counters, so it needs no backup.
 
 ## 4. Mobile release notes
-* Android: set your own `applicationId` (currently `com.melodia.melodia`) and signing config, then run
+* Android signing: release builds use `android/key.properties` (git-ignored: `storeFile`, `storePassword`,
+  `keyAlias`, `keyPassword`) and fall back to the debug key without it. Keep the keystore backed up; updates
+  must be signed with the same key.
+* Android: set your own `applicationId` (currently `com.melodia.melodia`), then run
   `flutter build appbundle --dart-define=API_BASE_URL=https://api.example.com/api/v1`.
 * iOS: open `ios/Runner.xcworkspace`. Background audio and the `melodia://` URL scheme are already in
   `Info.plist`. Set your team and bundle id.
