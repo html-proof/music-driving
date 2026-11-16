@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 /// SQLite-backed JSON cache for offline access to metadata the user has already
@@ -47,6 +48,35 @@ class SqliteLocalCache implements LocalCache {
   Future<void> clear() async {
     final db = await _open();
     await db.delete('cache');
+  }
+}
+
+/// Browser implementation (sqflite has no web backend): the same JSON entries, kept in
+/// SharedPreferences (localStorage) under a key prefix.
+class PrefsLocalCache implements LocalCache {
+  PrefsLocalCache(this._prefs);
+
+  final SharedPreferences _prefs;
+  static const _prefix = 'cache:';
+
+  @override
+  Future<Map<String, dynamic>?> read(String key) async {
+    final raw = _prefs.getString('$_prefix$key');
+    if (raw == null) return null;
+    return (jsonDecode(raw) as Map).cast<String, dynamic>();
+  }
+
+  @override
+  Future<void> write(String key, Object json) => _prefs.setString(
+        '$_prefix$key',
+        jsonEncode({'data': json, 'updated_at': DateTime.now().millisecondsSinceEpoch}),
+      );
+
+  @override
+  Future<void> clear() async {
+    for (final k in _prefs.getKeys().where((k) => k.startsWith(_prefix)).toList()) {
+      await _prefs.remove(k);
+    }
   }
 }
 

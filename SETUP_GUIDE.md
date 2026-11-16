@@ -47,6 +47,16 @@ flutter run
 # Physical device / other host:
 flutter run --dart-define=API_BASE_URL=http://192.168.1.20:8000/api/v1
 ```
+
+In Chrome (Flutter web), the default API is `http://localhost:8000/api/v1`:
+```bash
+flutter run -d chrome
+# Against the deployed API behind the Cloudflare Tunnel:
+flutter run -d chrome --dart-define=API_BASE_URL=https://api.example.com/api/v1
+```
+The browser calls the API cross-origin, so `CORS_ORIGINS` must allow the page's origin (`*` by default).
+On web the offline metadata cache lives in localStorage instead of SQLite.
+
 Cleartext HTTP is only allowed to `10.0.2.2`, `localhost` and `127.0.0.1` (Android
 `network_security_config.xml`, iOS `NSAllowsLocalNetworking`). For a device on your LAN, use HTTPS or add
 the host to those configs for development only.
