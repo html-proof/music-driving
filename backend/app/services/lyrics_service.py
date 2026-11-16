@@ -56,6 +56,18 @@ class LyricsService:
     async def close(self) -> None:
         await self._client.aclose()
 
+    async def cached(self, song_id: str) -> Lyrics | None:
+        """Lyrics already matched for this song, without touching any provider."""
+        if not self.enabled:
+            return None
+        hit = await self.cache.get(f"lyrics:{song_id}")
+        if hit is None:
+            return None
+        try:
+            return Lyrics.model_validate(hit)
+        except ValueError:
+            return None
+
     async def for_track(self, track: Track) -> Lyrics:
         empty = Lyrics(song_id=track.id, available=False, synced=False, source="lrclib")
         if not self.enabled:

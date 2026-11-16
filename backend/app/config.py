@@ -35,9 +35,26 @@ class Settings(BaseSettings):
     # Music provider (GaanaPy service)
     gaanapy_base_url: str = "http://localhost:8001"
     provider_timeout_seconds: float = 30.0
+    # Retries only cover GaanaPy itself being unreachable. When Gaana refuses a request
+    # (block / rate limit), retrying just prolongs the block, so the client backs off
+    # instead: no Gaana calls for the cooldown, doubling on each repeat up to the max.
     provider_retries: int = 2
+    provider_block_cooldown_seconds: int = 60
+    provider_block_cooldown_max_seconds: int = 600
     catalog_cache_ttl_seconds: int = 900
     search_cache_ttl_seconds: int = 300
+    # Home lists (trending, new releases, charts) change slowly; each refresh costs one
+    # Gaana request per song, so keep them longer and show fewer songs per row.
+    home_cache_ttl_seconds: int = 3600
+    home_section_size: int = 12
+    home_artist_count: int = 4
+    # Song/artist metadata rarely changes; long-lived so lyrics and artist cards never
+    # need a fresh Gaana lookup.
+    metadata_cache_ttl_seconds: int = 86400
+    # Last good copy of any catalogue response, served while Gaana is blocking us.
+    stale_cache_ttl_seconds: int = 86400
+    # "Not found" answers are remembered too, so missing items aren't re-requested.
+    not_found_cache_ttl_seconds: int = 900
     # Stream URLs carry their own expiry; refresh this long before it.
     stream_refresh_margin_seconds: int = 600
     verify_stream_quality: bool = True

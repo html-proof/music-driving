@@ -1,0 +1,27 @@
+diff --git a/api/gaanapy.py b/api/gaanapy.py
+index bc9ad07..c960308 100644
+--- a/api/gaanapy.py
++++ b/api/gaanapy.py
+@@ -1,4 +1,5 @@
+ import asyncio
++import os
+ import aiohttp
+ from api.songs.songs import Songs
+ from api.albums.albums import Albums
+@@ -20,8 +21,16 @@ class GaanaPy(Songs, Albums, Artists, Trending, NewReleases, Charts, Playlists,
+         self.api_endpoints = endpoints
+         self.functions = Functions()
+         self.errors = Errors()
++        # Every list endpoint fans out into one Gaana request per item (a trending list
++        # of 20 songs is 21 requests). Firing them all at once is what gets clients
++        # rate-limited and blocked, so cap how many are in flight together.
++        self._gate = asyncio.Semaphore(max(1, int(os.getenv("GAANA_MAX_CONCURRENT", "4"))))
+ 
+     async def _safe_request(self, method: str, url: str, **kwargs) -> dict:
++        async with self._gate:
++            return await self._request_now(method, url, **kwargs)
++
++    async def _request_now(self, method: str, url: str, **kwargs) -> dict:
+         try:
+             if method == "GET":
+                 response = await self.aiohttp.get(url, **kwargs)

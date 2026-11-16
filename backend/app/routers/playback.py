@@ -51,5 +51,9 @@ async def queue(user: CurrentUser, db: DB, catalog: Catalog,
 
 @router.get("/lyrics/{song_id}", response_model=LyricsOut, tags=["lyrics"])
 async def lyrics(song_id: SongId, catalog: Catalog, lyrics_service: Lyrics) -> LyricsOut:
+    # Lyrics are cached per song: answer from the cache without any catalogue lookup.
+    cached = await lyrics_service.cached(song_id)
+    if cached is not None:
+        return cached
     track = await catalog.song(song_id)
     return await lyrics_service.for_track(track)

@@ -19,7 +19,10 @@ cd third_party/GaanaPy
 python -m venv .venv && .venv/Scripts/pip install -r requirements.txt   # Linux/macOS: .venv/bin/pip
 .venv/Scripts/python -m uvicorn app:app --port 8001
 ```
-This copy includes fixes that aren't upstream yet ([`third_party/patches/gaanapy-local-fixes.patch`](third_party/patches/gaanapy-local-fixes.patch)).
+This copy includes fixes that aren't upstream yet ([`third_party/patches/gaanapy-local-fixes.patch`](third_party/patches/gaanapy-local-fixes.patch),
+[`third_party/patches/gaanapy-request-cap.patch`](third_party/patches/gaanapy-request-cap.patch)).
+The request cap keeps at most `GAANA_MAX_CONCURRENT` (default 4) requests to Gaana in flight, because
+bursts are what get the server rate-limited or blocked.
 The upstream commit is in `third_party/GAANAPY_UPSTREAM_COMMIT`.
 
 ### Backend

@@ -50,18 +50,53 @@ class CatalogService:
         self._probe = http_probe  # async (url) -> bool, used to verify stream qualities
 
     async def _cached(self, key: str, ttl: int, adapter: TypeAdapter, factory: Callable[[], Awaitable[T]]) -> T:
+        """Cache-first provider call that keeps Gaana traffic down:
+
+        * a fresh copy is served for `ttl`;
+        * a "not found" answer is remembered, so missing items aren't re-requested;
+        * the last good copy is kept much longer and served while the provider is
+          unavailable (blocked / rate-limited), so pages don't go blank during a block.
+        """
         hit = await self.cache.get(key)
         if hit is not None:
             try:
                 return adapter.validate_python(hit)
             except ValueError:
                 await self.cache.delete(key)
-        value = await factory()
-        await self.cache.set(key, adapter.dump_python(value, mode="json"), ttl)
+        if await self.cache.get(f"miss:{key}"):
+            raise ProviderNotFound("Not found")
+        try:
+            value = await factory()
+        except ProviderNotFound:
+            await self.cache.set(f"miss:{key}", True, self.settings.not_found_cache_ttl_seconds)
+            raise
+        except ProviderUnavailable:
+            stale = await self.cache.get(f"stale:{key}")
+            if stale is not None:
+                try:
+                    log.info("provider unavailable: serving last good copy of %s", key)
+                    return adapter.validate_python(stale)
+                except ValueError:
+                    pass
+            raise
+        dumped = adapter.dump_python(value, mode="json")
+        await self.cache.set(key, dumped, ttl)
+        await self.cache.set(f"stale:{key}", dumped, self.settings.stale_cache_ttl_seconds)
         return value
+
+    def _known(self, song_id: str) -> ProviderTrack | None:
+        known = getattr(self.provider, "known_track", None)
+        return known(song_id) if known else None
+
+    async def _remember_metadata(self, track: Track) -> None:
+        await self.cache.set(f"track:{track.id}", track.model_dump(mode="json"),
+                             self.settings.metadata_cache_ttl_seconds)
 
     def _ttl(self) -> int:
         return self.settings.catalog_cache_ttl_seconds
+
+    def _home_ttl(self) -> int:
+        return max(self.settings.home_cache_ttl_seconds, self._ttl())
 
     # --- discovery ---------------------------------------------------------
     async def search(self, query: str, limit: int = 10) -> SearchResults:
@@ -96,6 +131,18 @@ class CatalogService:
         return [p for p in charts if all(w in p.title.lower() for w in words)][:limit]
 
     async def song(self, song_id: str) -> Track:
+        """Song metadata. Served from the long-lived metadata cache or from a list the
+        provider already returned whenever possible (lyrics need only title/artist)."""
+        hit = await self.cache.get(f"track:{song_id}")
+        if hit:
+            try:
+                return Track.model_validate(hit)
+            except ValueError:
+                await self.cache.delete(f"track:{song_id}")
+        known = self._known(song_id)
+        if known:
+            await self._remember_metadata(known.track)
+            return known.track
         return (await self._song_with_streams(song_id)).track
 
     async def _song_with_streams(self, song_id: str, fresh: bool = False) -> ProviderTrack:
@@ -105,13 +152,28 @@ class CatalogService:
             if hit:
                 streams = {AudioQuality(q): u for q, u in hit["streams"].items()}
                 return ProviderTrack(Track.model_validate(hit["track"]), streams)
-        pt = await self.provider.get_song(song_id)
+            # Listed songs carry their stream URLs: no second lookup needed.
+            known = self._known(song_id)
+            if known and known.streams and not self._expired(known.streams):
+                await self._store_song(key, known)
+                return known
+        if await self.cache.get(f"miss:{key}"):
+            raise ProviderNotFound(f"Song {song_id} not found")
+        try:
+            pt = await self.provider.get_song(song_id)
+        except ProviderNotFound:
+            await self.cache.set(f"miss:{key}", True, self.settings.not_found_cache_ttl_seconds)
+            raise
+        await self._store_song(key, pt)
+        return pt
+
+    async def _store_song(self, key: str, pt: ProviderTrack) -> None:
         await self.cache.set(
             key,
             {"track": pt.track.model_dump(mode="json"), "streams": {q.value: u for q, u in pt.streams.items()}},
             self._stream_cache_ttl(pt.streams),
         )
-        return pt
+        await self._remember_metadata(pt.track)
 
     def _stream_cache_ttl(self, streams: dict[AudioQuality, str]) -> int:
         """Never cache past the stream token's own expiry (minus a safety margin)."""
@@ -144,6 +206,24 @@ class CatalogService:
 
         return await self._cached(f"artist:{artist_id}:{limit}", self._ttl(), TypeAdapter(ArtistDetail), load)
 
+    async def artist_card(self, artist_id: str) -> ArtistDetail:
+        """Name and picture only, for the home page. Reuses a full artist page when one
+        is cached; otherwise one lookup (no similar-artists call), kept for a day."""
+        for limit in (10, 5):
+            hit = await self.cache.get(f"artist:{artist_id}:{limit}")
+            if hit:
+                try:
+                    return ArtistDetail.model_validate(hit).model_copy(update={"top_tracks": []})
+                except ValueError:
+                    pass
+
+        async def load() -> ArtistDetail:
+            detail = await self.provider.get_artist(artist_id, 1)
+            return detail.model_copy(update={"top_tracks": [], "similar_artists": []})
+
+        return await self._cached(f"artist-card:{artist_id}", self.settings.metadata_cache_ttl_seconds,
+                                  TypeAdapter(ArtistDetail), load)
+
     async def similar_artists_for(self, artist_numeric_id: str, limit: int = 10) -> list[ArtistSummary]:
         return await self._cached(f"artist-similar:{artist_numeric_id}:{limit}", self._ttl(),
                                   TypeAdapter(list[ArtistSummary]),
@@ -155,15 +235,15 @@ class CatalogService:
                                   lambda: self.provider.artist_tracks(artist_numeric_id, limit, page))
 
     async def trending(self, language: str, limit: int = 20) -> list[Track]:
-        return await self._cached(f"trending:{language}:{limit}", self._ttl(), TypeAdapter(list[Track]),
+        return await self._cached(f"trending:{language}:{limit}", self._home_ttl(), TypeAdapter(list[Track]),
                                   lambda: self.provider.trending(language, limit))
 
     async def new_releases(self, language: str, limit: int = 20) -> NewReleases:
-        return await self._cached(f"new:{language}:{limit}", self._ttl(), TypeAdapter(NewReleases),
+        return await self._cached(f"new:{language}:{limit}", self._home_ttl(), TypeAdapter(NewReleases),
                                   lambda: self.provider.new_releases(language, limit))
 
     async def charts(self, limit: int = 20) -> list[PlaylistSummary]:
-        return await self._cached(f"charts:{limit}", self._ttl(), TypeAdapter(list[PlaylistSummary]),
+        return await self._cached(f"charts:{limit}", self._home_ttl(), TypeAdapter(list[PlaylistSummary]),
                                   lambda: self.provider.charts(limit))
 
     async def playlist(self, playlist_id: str) -> PlaylistDetail:

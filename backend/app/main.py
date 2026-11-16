@@ -50,7 +50,9 @@ def create_app(settings: Settings | None = None, provider=None, lyrics: LyricsSe
         prov = provider
         if prov is None:
             gaana_client = GaanaPyClient(settings.gaanapy_base_url, settings.provider_timeout_seconds,
-                                         settings.provider_retries)
+                                         settings.provider_retries,
+                                         block_cooldown_seconds=settings.provider_block_cooldown_seconds,
+                                         block_cooldown_max_seconds=settings.provider_block_cooldown_max_seconds)
             prov = GaanaProvider(gaana_client)
         app.state.settings = settings
         app.state.cache = cache

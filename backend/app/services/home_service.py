@@ -52,9 +52,12 @@ class HomeService:
             if recent:
                 sections.append(HomeSection(id="recently_played", title="Recently played", type="tracks", tracks=recent))
 
-        # Provider sections run concurrently; one failure must not blank the page.
-        jobs = {f"trending:{lang}": self.catalog.trending(lang, 20) for lang in langs[:3]}
-        jobs[f"new:{langs[0]}"] = self.catalog.new_releases(langs[0], 20)
+        # Provider sections run concurrently; one failure must not blank the page. Each
+        # listed song costs one Gaana request when a list is refreshed, so rows are kept
+        # short (HOME_SECTION_SIZE) and cached for an hour.
+        size = self.catalog.settings.home_section_size
+        jobs = {f"trending:{lang}": self.catalog.trending(lang, size) for lang in langs[:3]}
+        jobs[f"new:{langs[0]}"] = self.catalog.new_releases(langs[0], size)
         jobs["charts"] = self.catalog.charts(12)
         results = dict(zip(jobs, await asyncio.gather(*jobs.values(), return_exceptions=True), strict=True))
 
@@ -104,9 +107,11 @@ class HomeService:
 
         # "Artists trending now": the most frequent artists across the trending tracks.
         counts = Counter(a.id for t in trending_tracks for a in t.artists if a.id)
-        artist_keys = [k for k, _ in counts.most_common(8)]
+        artist_keys = [k for k, _ in counts.most_common(self.catalog.settings.home_artist_count)]
         if artist_keys:
-            fetched = await asyncio.gather(*[self.catalog.artist(k, 5) for k in artist_keys], return_exceptions=True)
+            # Cards need only a name and picture: no top tracks or similar artists.
+            fetched = await asyncio.gather(*[self.catalog.artist_card(k) for k in artist_keys],
+                                           return_exceptions=True)
             artists = [a for a in fetched if not isinstance(a, BaseException)]
             if artists:
                 sections.append(HomeSection(
